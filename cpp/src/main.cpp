@@ -73,27 +73,28 @@ int main(int argc, const char * argv[]) {
   std::cout << "Number of vertices " << j["vertices"].size() << std::endl;
 
   //-- add an attribute "volume"
-  for (auto& co : j["CityObjects"]) {
-    if (co["type"] == "Building") {
-      const std::vector<std::string>& children = co["children"].get<std::vector<std::string>>();
-      Mesh mesh;
-      FT vol = 0.0;
-      for (auto& child: children) {
-        if (!bld_mesh_from_json(j, child, mesh)) {
-          // Error
-          std::cerr << "Failed to convert building to mesh since this object doesn't have LoD >= 1.0" << std::endl;
-        }
-        if (!triangulate_mesh(mesh)) {
-          // Error
-          std::cerr << "Failed to triangulate mesh" << std::endl;
-        }
-        vol += volume_from_mesh(mesh);
+  for (auto& co : j["CityObjects"].items()) {
+    if (co.value()["type"] != "Building" || !co.value().contains("children"))
+      continue;
+
+    const std::vector<std::string>& children = co.value()["children"].get<std::vector<std::string>>();
+    Mesh mesh;
+    FT vol = 0.0;
+    for (auto& child: children) {
+      if (!bld_mesh_from_json(j, child, mesh)) {
+        // Error
+        std::cerr << "Failed to convert building to mesh since this object doesn't have LoD >= 1.0" << std::endl;
       }
-      
-      vol = vol * scale[0] * scale[1] * scale[2];
-      std::cout << "vol: " << vol << std::endl;
-      co["attributes"]["volume"] = vol;
+      if (!triangulate_mesh(mesh)) {
+        // Error
+        std::cerr << "Failed to triangulate mesh" << std::endl;
+      }
+      vol += volume_from_mesh(mesh);
     }
+
+    vol = vol * scale[0] * scale[1] * scale[2];
+    std::cout << "Volume for object " << co.key() << ": " << vol << std::endl;
+    co.value()["attributes"]["volume"] = vol;
   }
 
   //-- write to disk the modified city model (out.city.json)
