@@ -27,6 +27,7 @@ void  visit_roofsurfaces(json &j);
 int main(int argc, const char * argv[]) {
   //-- will read the file passed as argument or twobuildings.city.json if nothing is passed
   const char* filename = (argc > 1) ? argv[1] : "../../data/nextbk_2b.city.json";
+  // const char* filename = (argc > 1) ? argv[1] : "../../data/9-284-556.city.json";
   std::cout << "Processing: " << filename << std::endl;
   std::ifstream input(filename);
   json j;
@@ -37,7 +38,7 @@ int main(int argc, const char * argv[]) {
   int noroofsurfaces = get_no_roof_surfaces(j);
   std::cout << "Total RoofSurface: " << noroofsurfaces << std::endl;
 
-  list_all_vertices(j);
+  // list_all_vertices(j);
 
   visit_roofsurfaces(j);
 
@@ -79,7 +80,7 @@ void visit_roofsurfaces(json &j) {
           for (int j = 0; j < g["boundaries"][i].size(); j++) {
             int sem_index = g["semantics"]["values"][i][j];
             if (g["semantics"]["surfaces"][sem_index]["type"].get<std::string>().compare("RoofSurface") == 0) {
-              std::cout << "RoofSurface: " << g["boundaries"][i][j] << std::endl;
+              // std::cout << "RoofSurface: " << g["boundaries"][i][j] << std::endl;
             }
           }
         }
