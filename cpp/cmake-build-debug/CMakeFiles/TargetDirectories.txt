@@ -1,0 +1,3 @@
+C:/Users/daans/Documents/GitHub/geo-1004-hw02/cpp/cmake-build-debug/CMakeFiles/cjdemo.dir
+C:/Users/daans/Documents/GitHub/geo-1004-hw02/cpp/cmake-build-debug/CMakeFiles/edit_cache.dir
+C:/Users/daans/Documents/GitHub/geo-1004-hw02/cpp/cmake-build-debug/CMakeFiles/rebuild_cache.dir

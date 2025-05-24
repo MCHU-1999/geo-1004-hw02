@@ -1,4 +1,4 @@
-"C:\Program Files\JetBrains\CLion 2024.2.2\bin\cmake\win\x64\bin\cmake.exe" -DCMAKE_BUILD_TYPE=Debug "-DCMAKE_MAKE_PROGRAM=C:/Program Files/JetBrains/CLion 2024.2.2/bin/ninja/win/x64/ninja.exe" -DCMAKE_TOOLCHAIN_FILE=C:/Users/daans/vcpkg/scripts/buildsystems/vcpkg.cmake -G Ninja -S C:\Users\daans\Documents\GitHub\geo-1004-hw02\cpp -B C:\Users\daans\Documents\GitHub\geo-1004-hw02\cpp\cmake-build-debug
+"C:\Program Files\JetBrains\CLion 2024.2.2\bin\cmake\win\x64\bin\cmake.exe" -DCMAKE_BUILD_TYPE=Release "-DCMAKE_MAKE_PROGRAM=C:/Program Files/JetBrains/CLion 2024.2.2/bin/ninja/win/x64/ninja.exe" -DCMAKE_TOOLCHAIN_FILE=C:/Users/daans/vcpkg/scripts/buildsystems/vcpkg.cmake -G Ninja -S C:\Users\daans\Documents\GitHub\geo-1004-hw02\cpp -B C:\Users\daans\Documents\GitHub\geo-1004-hw02\cpp\cmake-build-release
 -- Visual Leak Detector (VLD) is not found.
 -- Targeting Ninja
 -- Target build environment supports auto-linking

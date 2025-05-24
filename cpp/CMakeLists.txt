@@ -29,3 +29,4 @@ FILE(GLOB SRC_FILES src/*.cpp)
 add_executable(cjdemo ${SRC_FILES})
 
 target_link_libraries(${PROJECT_NAME} CGAL::CGAL CGAL::Eigen3_support)
+#target_link_libraries(${PROJECT_NAME} CGAL::CGAL)
