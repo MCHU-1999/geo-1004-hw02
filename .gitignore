@@ -1,2 +1,8 @@
 .vscode/
 build/
+cpp/.idea/
+cpp/.vscode/
+cpp/build/
+cpp/cmake-build-*/
+cpp/cmake-build-*/**
+/cpp/cmake-build-debug
