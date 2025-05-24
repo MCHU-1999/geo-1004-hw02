@@ -51,7 +51,7 @@ build cmake_object_order_depends_target_cjdemo: phony || .
 
 build CMakeFiles\cjdemo.dir\src\main.cpp.obj: CXX_COMPILER__cjdemo_unscanned_Release C$:\Users\daans\Documents\GitHub\geo-1004-hw02\cpp\src\main.cpp || cmake_object_order_depends_target_cjdemo
   DEFINES = -DBOOST_ALL_DYN_LINK=1 -DCGAL_USE_GMPXX=1
-  FLAGS = -O2 /O2 /Ob2 /DNDEBUG -std:c++17 -MD -D_SCL_SECURE_NO_DEPRECATE -D_SCL_SECURE_NO_WARNINGS /fp:strict /fp:except- /bigobj
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD   /W4 /O2 -D_SCL_SECURE_NO_DEPRECATE -D_SCL_SECURE_NO_WARNINGS /fp:strict /fp:except- /bigobj
   INCLUDES = -IC:\Users\daans\Documents\GitHub\geo-1004-hw02\cpp\include -external:IC:\Users\daans\vcpkg\installed\x64-windows\include -external:W0
   OBJECT_DIR = CMakeFiles\cjdemo.dir
   OBJECT_FILE_DIR = CMakeFiles\cjdemo.dir\src
@@ -67,7 +67,7 @@ build CMakeFiles\cjdemo.dir\src\main.cpp.obj: CXX_COMPILER__cjdemo_unscanned_Rel
 # Link the executable cjdemo.exe
 
 build cjdemo.exe: CXX_EXECUTABLE_LINKER__cjdemo_Release CMakeFiles\cjdemo.dir\src\main.cpp.obj | C$:\Users\daans\vcpkg\installed\x64-windows\lib\gmpxx.lib C$:\Users\daans\vcpkg\installed\x64-windows\lib\mpfr.lib C$:\Users\daans\vcpkg\installed\x64-windows\lib\gmp.lib
-  FLAGS = -O2 /O2 /Ob2 /DNDEBUG -MD
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -MD
   LINK_FLAGS = /machine:x64 /INCREMENTAL:NO /subsystem:console
   LINK_LIBRARIES = C:\Users\daans\vcpkg\installed\x64-windows\lib\gmpxx.lib  C:\Users\daans\vcpkg\installed\x64-windows\lib\mpfr.lib  C:\Users\daans\vcpkg\installed\x64-windows\lib\gmp.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib
   OBJECT_DIR = CMakeFiles\cjdemo.dir

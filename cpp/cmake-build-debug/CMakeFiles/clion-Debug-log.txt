@@ -14,7 +14,7 @@ Call Stack (most recent call first):
   C:/Users/daans/vcpkg/installed/x64-windows/share/cgal/CGAL_SetupCGALDependencies.cmake:48 (include)
   C:/Users/daans/vcpkg/installed/x64-windows/share/cgal/CGALConfig.cmake:169 (include)
   C:/Users/daans/vcpkg/scripts/buildsystems/vcpkg.cmake:893 (_find_package)
-  CMakeLists.txt:15 (find_package)
+  CMakeLists.txt:22 (find_package)
 This warning is for project developers.  Use -Wno-dev to suppress it.
 
 -- Boost include dirs: C:/Users/daans/vcpkg/installed/x64-windows/include
@@ -23,24 +23,5 @@ This warning is for project developers.  Use -Wno-dev to suppress it.
 -- CGAL
 -- 
 -- Configuring done (0.6s)
-CMake Error at CMakeLists.txt:31 (target_link_libraries):
-  Target "cjdemo" links to:
-
-    CGAL::Eigen3_support
-
-  but the target was not found.  Possible reasons include:
-
-    * There is a typo in the target name.
-    * A find_package call is missing for an IMPORTED target.
-    * An ALIAS target is missing.
-
-
-
 -- Generating done (0.0s)
-CMake Generate step failed.  Build files cannot be regenerated correctly.
-
-Cannot get compiler information:
-	Compiler exited with error code 1: C:\msys64\mingw64\bin\g++.exe @C:\Users\daans\AppData\Local\Temp\response-file17070655660137122373 C:\Users\daans\AppData\Local\Temp\compiler-file12348454702981155991 | @response-file17070655660137122373=/TP /DBOOST_ALL_DYN_LINK=1 /DCGAL_USE_GMPXX=1 -O2 /O2 /Ob2 /DNDEBUG -std:c++17 -MD -D_SCL_SECURE_NO_DEPRECATE -D_SCL_SECURE_NO_WARNINGS /fp:strict /fp:except- /bigobj /Be /Bd /E /w /wd4067
-	g++.exe: error: unrecognized command-line option '-std:c++17'; did you mean '-std=c++17'?
-	
-	
+-- Build files have been written to: C:/Users/daans/Documents/GitHub/geo-1004-hw02/cpp/cmake-build-debug

@@ -40,7 +40,7 @@
 			{
 				"command" : 1,
 				"file" : 1,
-				"line" : 29,
+				"line" : 38,
 				"parent" : 0
 			},
 			{
@@ -52,7 +52,7 @@
 			{
 				"command" : 7,
 				"file" : 1,
-				"line" : 15,
+				"line" : 22,
 				"parent" : 0
 			},
 			{
@@ -98,13 +98,13 @@
 			{
 				"command" : 2,
 				"file" : 1,
-				"line" : 32,
+				"line" : 41,
 				"parent" : 0
 			},
 			{
 				"command" : 8,
 				"file" : 1,
-				"line" : 12,
+				"line" : 19,
 				"parent" : 0
 			}
 		]
@@ -115,7 +115,7 @@
 			"compileCommandFragments" : 
 			[
 				{
-					"fragment" : "-O2 /O2 /Ob2 /DNDEBUG -std:c++17 -MD"
+					"fragment" : "/DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD   /W4 /O2"
 				},
 				{
 					"backtrace" : 11,
@@ -182,7 +182,7 @@
 		"commandFragments" : 
 		[
 			{
-				"fragment" : "-O2 /O2 /Ob2 /DNDEBUG -MD",
+				"fragment" : "/DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -MD",
 				"role" : "flags"
 			},
 			{
