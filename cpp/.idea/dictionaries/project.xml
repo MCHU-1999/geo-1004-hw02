@@ -2,6 +2,14 @@
   <dictionary name="project">
     <words>
       <w>cjdemo</w>
+      <w>cout</w>
+      <w>endl</w>
+      <w>ledoux</w>
+      <w>nextbk</w>
+      <w>nobuildings</w>
+      <w>noroofsurfaces</w>
+      <w>roofsurfaces</w>
+      <w>twobuildings</w>
     </words>
   </dictionary>
 </component>
