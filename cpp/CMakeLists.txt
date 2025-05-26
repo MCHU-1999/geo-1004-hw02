@@ -44,6 +44,6 @@ endif()
 
 # Link libraries
 target_link_libraries(${PROJECT_NAME} CGAL::CGAL)
-if(TARGET CGAL::Eigen3_support)
-  target_link_libraries(${PROJECT_NAME} CGAL::Eigen3_support)
-endif()
+# if(TARGET CGAL::Eigen3_support)
+#   target_link_libraries(${PROJECT_NAME} CGAL::Eigen3_support)
+# endif()
