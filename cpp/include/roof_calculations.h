@@ -17,4 +17,6 @@ std::pair<double, std::string> analyse_roof_surface(
     const std::vector<std::vector<Point_3>> &inner_rings
 );
 
+double calculate_orientation_azimuth(const Kernel::Vector_3 &normal);
+
 #endif // ROOF_CALCULATIONS_H

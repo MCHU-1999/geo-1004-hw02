@@ -18,6 +18,8 @@
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/Polygon_mesh_processing/triangulate_faces.h>
 #include <CGAL/boost/graph/helpers.h>
+#include <CGAL/Min_quadrilateral_2.h>
+#include <CGAL/Polygon_2.h>
 
 //-- https://github.com/nlohmann/json
 //-- used to read and write (City)JSON
@@ -31,6 +33,11 @@ typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
 typedef Kernel::Point_3                                    Point_3;
 typedef CGAL::Surface_mesh<Point_3>                           Mesh;
 typedef Kernel::FT                                              FT;
+typedef CGAL::Polygon_2<Kernel> Polygon_2;
+typedef Kernel::Point_2 Point_2;
+typedef Kernel::Vector_3 Vector_3;
+typedef Kernel::Vector_2 Vector_2;
+
 
 namespace PMP = CGAL::Polygon_mesh_processing;
 
@@ -42,13 +49,14 @@ bool bld_mesh_from_json(json& j, std::string key, Mesh& mesh);
 bool triangulate_mesh(Mesh& mesh, bool verbose=false);
 FT volume_from_mesh(const Mesh& mesh);
 const std::vector<std::string> lod_tier = {"2.2", "2.1", "2.0", "2", "1.3", "1.2", "1.1", "1.0", "1"};
+double compute_footprint_orientation(const json &j, const std::vector<std::array<double, 3> > &vertices);
 
 
 // Main function
 int main(int argc, const char *argv[]) {
   //-- will read the file passed as an argument or twobuildings.city.json if nothing is passed
-  const char *filename = (argc > 1) ? argv[1] : "../../data/nextbk_2b.city.json";
-  // const char* filename = (argc > 1) ? argv[1] : "../../data/9-284-556.city.json";
+  // const char *filename = (argc > 1) ? argv[1] : "../../data/nextbk_2b.city.json";
+  const char* filename = (argc > 1) ? argv[1] : "../../data/9-284-556.city.json";
   std::cout << "Processing: " << filename << std::endl;
   std::ifstream input(filename);
   json j;
@@ -60,6 +68,8 @@ int main(int argc, const char *argv[]) {
 
   //-- get vertices from cityJSON
   auto vertices = get_vertices(j);
+  double footprint_orientation = compute_footprint_orientation(j, vertices);
+  std::cout << "Footprint orientation: " << footprint_orientation << " degrees\n";
 
   // Process roof surfaces to calculate area and orientation
   // Implementation of process_roof_surfaces function
@@ -249,6 +259,53 @@ FT volume_from_mesh(const Mesh& mesh) {
 }
 
 
+// Compute, based on the LOD0 footprint the dominant axis of the building, and return that as azimuth orientation.
+double compute_footprint_orientation(const json &j, const std::vector<std::array<double, 3> > &vertices) {
+  for (const auto &co: j["CityObjects"].items()) {
+    const auto &obj = co.value();
+    if (obj["type"] != "Building") continue;
+    for (const auto &geom: obj["geometry"]) {
+      if (geom["lod"] != "0") continue;
+
+      // Fallback to -1.0
+      if (!geom.contains("boundaries") || geom["boundaries"].empty() ||
+          !geom["boundaries"][0].is_array() || geom["boundaries"][0].empty()) {
+        return -1.0;
+      }
+
+      const auto ring = geom["boundaries"][0][0]; // LOD0 always has 1 outer ring.
+
+      // Get the 3D coordinates from the vertex indices, then push them to 2D since the footprint is flat.
+      Polygon_2 footprint;
+      for (const auto &v_index: ring) {
+        int index = v_index.get<int>();
+        const auto &pt = vertices[index];
+        footprint.push_back(Point_2(pt[0], pt[1]));
+        // std::cout << "(" << pt[0] << ", " << pt[1] << ")" << std::endl;
+      }
+
+      // Using CGAL, compute the minimum rectangle
+      std::vector<Point_2> p_m;
+      CGAL::min_rectangle_2(footprint.vertices_begin(), footprint.vertices_end(), std::back_inserter(p_m));
+
+
+      // Determine the dominant vector
+      Vector_2 v1 = p_m[1] - p_m[0];
+      Vector_2 v2 = p_m[2] - p_m[1];
+      Vector_2 dominant_vec_2d = (v1.squared_length() > v2.squared_length()) ? v1 : v2;
+      if (dominant_vec_2d.y() < 0) dominant_vec_2d = -dominant_vec_2d; // Make sure it points upwards.
+
+      Vector_3 dominant_vec_3d(dominant_vec_2d.x(), dominant_vec_2d.y(), 1);
+
+      // Compute the azimuth for the overall building orientation
+      double azimuth = calculate_orientation_azimuth(dominant_vec_3d);
+      return azimuth;
+      // std::cout << "Building " << co.key() << " footprint orientation: " << azimuth << " degrees\n";
+    }
+  }
+  return -1.0;
+}
+
 // Visit every 'RoofSurface' in the CityJSON model and print its vertices
 void visit_roofsurfaces(json &j, const std::vector<std::array<double, 3> > &vertices) {
   for (auto &co: j["CityObjects"].items()) {
@@ -285,26 +342,26 @@ void visit_roofsurfaces(json &j, const std::vector<std::array<double, 3> > &vert
               }
 
               // Print outer ring
-              std::cout << "Outer ring points:" << std::endl;
-              for (const auto &p: outer_ring) {
-                std::cout << "(" << p.x() << ", " << p.y() << ", " << p.z() << ")" << std::endl;
-              }
-
-              // Print inner rings
-              for (size_t r = 0; r < inner_rings.size(); ++r) {
-                std::cout << "Inner ring " << r << " points:" << std::endl;
-                for (const auto &p: inner_rings[r]) {
-                  std::cout << "(" << p.x() << ", " << p.y() << ", " << p.z() << ")" << std::endl;
-                }
-              }
+              // std::cout << "Outer ring points:" << std::endl;
+              // for (const auto &p: outer_ring) {
+              //   std::cout << "(" << p.x() << ", " << p.y() << ", " << p.z() << ")" << std::endl;
+              // }
+              //
+              // // Print inner rings
+              // for (size_t r = 0; r < inner_rings.size(); ++r) {
+              //   std::cout << "Inner ring " << r << " points:" << std::endl;
+              //   for (const auto &p: inner_rings[r]) {
+              //     std::cout << "(" << p.x() << ", " << p.y() << ", " << p.z() << ")" << std::endl;
+              //   }
+              // }
 
               // Big boy function
               auto [roof_area, roof_orientation] = analyse_roof_surface(outer_ring, inner_rings);
 
               // Print results
-              std::cout << "Building: " << building_id << ", LoD: " << lod
-                  << ", RoofSurface area: " << roof_area << " m^2, "
-                  << "orientation: " << roof_orientation << std::endl;
+              // std::cout << "Building: " << building_id << ", LoD: " << lod
+              //     << ", RoofSurface area: " << roof_area << " m^2, "
+              //     << "orientation: " << roof_orientation << std::endl;
             }
           }
         }
