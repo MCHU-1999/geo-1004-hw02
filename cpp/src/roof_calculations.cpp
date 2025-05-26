@@ -44,18 +44,21 @@ Vector_3 calculate_polygon_normal(const std::vector<Point_3> &polygon_points) {
 }
 
 
-// Convert a normal vector to one of 8 orientations or "horizontal"
+// Calculate the azimuth from the normal vector
+double calculate_orientation_azimuth(const Vector_3 &normal) {
+    double azimuth = std::atan2(normal.x(), normal.y()) * 180.0 / CGAL_PI;
+    if (azimuth < 0) azimuth += 360;
+    return azimuth;
+}
+
+// Classify the orientation based on the azimuth
 std::string classify_orientation(const Vector_3 &normal) {
-    if (std::abs(normal.z()) > 0.95) // If Z is close to 1, it's near vertical thus horizontal
+    double azimuth = calculate_orientation_azimuth(normal);
+    if (std::abs(normal.z()) > 0.95) // Near vertical -> horizontal
         return "horizontal";
 
-    // Compute azimuth in degrees, atan2(x, y) makes it clockwise from north.
-    double angle = std::atan2(normal.x(), normal.y()) * 180.0 / CGAL_PI;
-    if (angle < 0) angle += 360;
-
-    // Map the angle_deg to one of the 8 (given) compass directions
     static const std::array<std::string, 8> directions = {"NE", "EN", "ES", "SE", "SW", "WS", "WN", "NW"};
-    int index = static_cast<int>(angle / 45.0) % 8;
+    int index = static_cast<int>(azimuth / 45.0) % 8;
     return directions[index];
 }
 
@@ -142,7 +145,7 @@ double calculate_polygon_area(const std::vector<Point_3> &polygon_points,
 
 std::pair<double, std::string> analyse_roof_surface(
     const std::vector<Point_3> &outer_ring,
-    const std::vector<std::vector<Point_3>> &inner_rings
+    const std::vector<std::vector<Point_3> > &inner_rings
 ) {
     Vector_3 normal = calculate_polygon_normal(outer_ring);
     std::string orientation = classify_orientation(normal);
