@@ -19,19 +19,13 @@
 #include <CGAL/Polygon_mesh_processing/triangulate_faces.h>
 #include <CGAL/boost/graph/helpers.h>
 
-
 //-- https://github.com/nlohmann/json
 //-- used to read and write (City)JSON
 #include "json.hpp" //-- it is in the /include/ folder
-#include "roof_calculations.h" // For roof area and orientation calculations
-
-// CGAL includes
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
-
-typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
-typedef Kernel::Point_3 Point_3;
-
 using json = nlohmann::json;
+
+// For roof area and orientation calculations
+#include "roof_calculations.h"
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
 typedef Kernel::Point_3                                    Point_3;
@@ -40,19 +34,15 @@ typedef Kernel::FT                                              FT;
 
 namespace PMP = CGAL::Polygon_mesh_processing;
 
-int   get_no_roof_surfaces(json &j);
-void  list_all_vertices(json& j);
-void  visit_roofsurfaces(json &j);
+// Declarations
+std::vector<std::array<double, 3> > get_vertices(json &j);
+void visit_roofsurfaces(json &j, const std::vector<std::array<double, 3> > &vertices);
 
 bool bld_mesh_from_json(json& j, std::string key, Mesh& mesh);
 bool triangulate_mesh(Mesh& mesh, bool verbose=false);
 FT volume_from_mesh(const Mesh& mesh);
 const std::vector<std::string> lod_tier = {"2.2", "2.1", "2.0", "2", "1.3", "1.2", "1.1", "1.0", "1"};
 
-// Declarations
-std::vector<std::array<double, 3> > get_vertices(json &j);
-
-void visit_roofsurfaces(json &j, const std::vector<std::array<double, 3> > &vertices);
 
 // Main function
 int main(int argc, const char *argv[]) {
@@ -68,12 +58,7 @@ int main(int argc, const char *argv[]) {
   //-- get scale from cityJSON
   const std::vector<double>& scale = j["transform"]["scale"].get<std::vector<double>>();
 
-  //-- get total number of RoofSurface in the file
-  int noroofsurfaces = get_no_roof_surfaces(j);
-  std::cout << "Total RoofSurface: " << noroofsurfaces << std::endl;
-
-  // list_all_vertices(j);
-  // visit_roofsurfaces(j);
+  //-- get vertices from cityJSON
   auto vertices = get_vertices(j);
 
   // Process roof surfaces to calculate area and orientation
