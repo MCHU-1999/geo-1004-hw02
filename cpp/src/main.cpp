@@ -35,141 +35,141 @@ void visit_roofsurfaces(json &j, const std::vector<std::array<double, 3> > &vert
 
 // Main function
 int main(int argc, const char *argv[]) {
-    //-- will read the file passed as an argument or twobuildings.city.json if nothing is passed
-    const char *filename = (argc > 1) ? argv[1] : "../../data/nextbk_2b.city.json";
-    // const char* filename = (argc > 1) ? argv[1] : "../../data/9-284-556.city.json";
-    std::cout << "Processing: " << filename << std::endl;
-    std::ifstream input(filename);
-    json j;
-    input >> j; //-- store the content of the file in a nlohmann::json object
-    input.close();
+  //-- will read the file passed as an argument or twobuildings.city.json if nothing is passed
+  const char *filename = (argc > 1) ? argv[1] : "../../data/nextbk_2b.city.json";
+  // const char* filename = (argc > 1) ? argv[1] : "../../data/9-284-556.city.json";
+  std::cout << "Processing: " << filename << std::endl;
+  std::ifstream input(filename);
+  json j;
+  input >> j; //-- store the content of the file in a nlohmann::json object
+  input.close();
 
-    auto vertices = get_vertices(j);
+  auto vertices = get_vertices(j);
 
-    // Process roof surfaces to calculate area and orientation
-    // Implementation of process_roof_surfaces function
-    for (auto &co: j["CityObjects"].items()) {
-        for (auto &g: co.value()["geometry"]) {
-            if (g["type"] == "Solid" && g.contains("semantics")) {
-                for (size_t i = 0; i < g["boundaries"].size(); i++) {
-                    for (size_t k = 0; k < g["boundaries"][i].size(); k++) {
-                        int sem_index = g["semantics"]["values"][i][k];
+  // Process roof surfaces to calculate area and orientation
+  // Implementation of process_roof_surfaces function
+  for (auto &co: j["CityObjects"].items()) {
+    for (auto &g: co.value()["geometry"]) {
+      if (g["type"] == "Solid" && g.contains("semantics")) {
+        for (size_t i = 0; i < g["boundaries"].size(); i++) {
+          for (size_t k = 0; k < g["boundaries"][i].size(); k++) {
+            int sem_index = g["semantics"]["values"][i][k];
 
-                        // Get only the RoofSurfaces
-                        if (g["semantics"]["surfaces"][sem_index]["type"].get<std::string>() == "RoofSurface") {
-                            // Add roof analysis attributes to the semantic surface
-                            g["semantics"]["surfaces"][sem_index]["attributes"]["processed"] = true;
-                        }
-                    }
-                }
+            // Get only the RoofSurfaces
+            if (g["semantics"]["surfaces"][sem_index]["type"].get<std::string>() == "RoofSurface") {
+              // Add roof analysis attributes to the semantic surface
+              g["semantics"]["surfaces"][sem_index]["attributes"]["processed"] = true;
             }
+          }
         }
+      }
     }
+  }
 
-    // For backward compatibility, still call the visit_roofsurfaces function
-    visit_roofsurfaces(j, vertices);
+  // For backward compatibility, still call the visit_roofsurfaces function
+  visit_roofsurfaces(j, vertices);
 
 
-    //-- print out the number of Buildings in the file
-    int nobuildings = 0;
-    for (auto &co: j["CityObjects"]) {
-        if (co["type"] == "Building") {
-            nobuildings += 1;
-        }
+  //-- print out the number of Buildings in the file
+  int nobuildings = 0;
+  for (auto &co: j["CityObjects"]) {
+    if (co["type"] == "Building") {
+      nobuildings += 1;
     }
-    std::cout << "There are " << nobuildings << " Buildings in the file" << std::endl;
-    std::cout << "Number of vertices " << j["vertices"].size() << std::endl;
+  }
+  std::cout << "There are " << nobuildings << " Buildings in the file" << std::endl;
+  std::cout << "Number of vertices " << j["vertices"].size() << std::endl;
 
-    //-- add an attribute "volume"
-    for (auto &co: j["CityObjects"]) {
-        if (co["type"] == "Building") {
-            co["attributes"]["volume"] = -1;
-        }
+  //-- add an attribute "volume"
+  for (auto &co: j["CityObjects"]) {
+    if (co["type"] == "Building") {
+      co["attributes"]["volume"] = -1;
     }
+  }
 
-    //-- write to disk the modified city model (out.city.json)
-    std::ofstream o("out.city.json");
-    o << j.dump(2) << std::endl;
-    o.close();
+  //-- write to disk the modified city model (out.city.json)
+  std::ofstream o("out.city.json");
+  o << j.dump(2) << std::endl;
+  o.close();
 
-    return 0;
+  return 0;
 }
 
 
 // Visit every 'RoofSurface' in the CityJSON model and print its vertices
 void visit_roofsurfaces(json &j, const std::vector<std::array<double, 3> > &vertices) {
-    for (auto &co: j["CityObjects"].items()) {
-        const std::string &building_id = co.key();
-        for (auto &g: co.value()["geometry"]) {
-            std::string lod = g["lod"].get<std::string>();
-            if (g["type"] == "Solid") {
-                for (size_t i = 0; i < g["boundaries"].size(); i++) {
-                    for (size_t k = 0; k < g["boundaries"][i].size(); k++) {
-                        int sem_index = g["semantics"]["values"][i][k];
+  for (auto &co: j["CityObjects"].items()) {
+    const std::string &building_id = co.key();
+    for (auto &g: co.value()["geometry"]) {
+      std::string lod = g["lod"].get<std::string>();
+      if (g["type"] == "Solid") {
+        for (size_t i = 0; i < g["boundaries"].size(); i++) {
+          for (size_t k = 0; k < g["boundaries"][i].size(); k++) {
+            int sem_index = g["semantics"]["values"][i][k];
 
-                        // Get only the RoofSurfaces
-                        if (g["semantics"]["surfaces"][sem_index]["type"].get<std::string>() == "RoofSurface") {
-                            // std::cout << "RoofSurface vertices:" << std::endl;
+            // Get only the RoofSurfaces
+            if (g["semantics"]["surfaces"][sem_index]["type"].get<std::string>() == "RoofSurface") {
+              // std::cout << "RoofSurface vertices:" << std::endl;
 
-                            // Extract outer ring points
-                            std::vector<Point_3> outer_ring;
-                            for (auto &v_idx: g["boundaries"][i][k][0]) {
-                                int idx = v_idx.get<int>();
-                                auto &pt = vertices[idx];
-                                outer_ring.emplace_back(pt[0], pt[1], pt[2]);
-                            }
+              // Extract outer ring points
+              std::vector<Point_3> outer_ring;
+              for (auto &v_idx: g["boundaries"][i][k][0]) {
+                int idx = v_idx.get<int>();
+                auto &pt = vertices[idx];
+                outer_ring.emplace_back(pt[0], pt[1], pt[2]);
+              }
 
-                            // Extract inner rings points (holes)
-                            std::vector<std::vector<Point_3> > inner_rings;
-                            for (size_t r = 1; r < g["boundaries"][i][k].size(); r++) {
-                                std::vector<Point_3> inner_ring;
-                                for (auto &v_idx: g["boundaries"][i][k][r]) {
-                                    int idx = v_idx.get<int>();
-                                    auto &pt = vertices[idx];
-                                    inner_ring.emplace_back(pt[0], pt[1], pt[2]);
-                                }
-                                inner_rings.push_back(inner_ring);
-                            }
-
-                            // Print outer ring
-                            std::cout << "Outer ring points:" << std::endl;
-                            for (const auto &p: outer_ring) {
-                                std::cout << "(" << p.x() << ", " << p.y() << ", " << p.z() << ")" << std::endl;
-                            }
-
-                            // Print inner rings
-                            for (size_t r = 0; r < inner_rings.size(); ++r) {
-                                std::cout << "Inner ring " << r << " points:" << std::endl;
-                                for (const auto &p: inner_rings[r]) {
-                                    std::cout << "(" << p.x() << ", " << p.y() << ", " << p.z() << ")" << std::endl;
-                                }
-                            }
-
-                            // Big boy function
-                            auto [roof_area, roof_orientation] = analyse_roof_surface(outer_ring, inner_rings);
-
-                            // Print results
-                            std::cout << "Building: " << building_id << ", LoD: " << lod
-                                    << ", RoofSurface area: " << roof_area << " m^2, "
-                                    << "orientation: " << roof_orientation << std::endl;
-                        }
-                    }
+              // Extract inner rings points (holes)
+              std::vector<std::vector<Point_3> > inner_rings;
+              for (size_t r = 1; r < g["boundaries"][i][k].size(); r++) {
+                std::vector<Point_3> inner_ring;
+                for (auto &v_idx: g["boundaries"][i][k][r]) {
+                  int idx = v_idx.get<int>();
+                  auto &pt = vertices[idx];
+                  inner_ring.emplace_back(pt[0], pt[1], pt[2]);
                 }
+                inner_rings.push_back(inner_ring);
+              }
+
+              // Print outer ring
+              std::cout << "Outer ring points:" << std::endl;
+              for (const auto &p: outer_ring) {
+                std::cout << "(" << p.x() << ", " << p.y() << ", " << p.z() << ")" << std::endl;
+              }
+
+              // Print inner rings
+              for (size_t r = 0; r < inner_rings.size(); ++r) {
+                std::cout << "Inner ring " << r << " points:" << std::endl;
+                for (const auto &p: inner_rings[r]) {
+                  std::cout << "(" << p.x() << ", " << p.y() << ", " << p.z() << ")" << std::endl;
+                }
+              }
+
+              // Big boy function
+              auto [roof_area, roof_orientation] = analyse_roof_surface(outer_ring, inner_rings);
+
+              // Print results
+              std::cout << "Building: " << building_id << ", LoD: " << lod
+                  << ", RoofSurface area: " << roof_area << " m^2, "
+                  << "orientation: " << roof_orientation << std::endl;
             }
+          }
         }
+      }
     }
+  }
 }
 
 
 // Returns all vertices scaled to their actual values, no translation necessary for our purposes.
 std::vector<std::array<double, 3> > get_vertices(json &j) {
-    std::vector<std::array<double, 3> > transformed_vertices;
-    for (auto &v: j["vertices"]) {
-        std::vector<int> vi = v;
-        double x = vi[0] * j["transform"]["scale"][0].get<double>();
-        double y = vi[1] * j["transform"]["scale"][1].get<double>();
-        double z = vi[2] * j["transform"]["scale"][2].get<double>();
-        transformed_vertices.push_back({x, y, z});
-    }
-    return transformed_vertices;
+  std::vector<std::array<double, 3> > transformed_vertices;
+  for (auto &v: j["vertices"]) {
+    std::vector<int> vi = v;
+    double x = vi[0] * j["transform"]["scale"][0].get<double>();
+    double y = vi[1] * j["transform"]["scale"][1].get<double>();
+    double z = vi[2] * j["transform"]["scale"][2].get<double>();
+    transformed_vertices.push_back({x, y, z});
+  }
+  return transformed_vertices;
 }
