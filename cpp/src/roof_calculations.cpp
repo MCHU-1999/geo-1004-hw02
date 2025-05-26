@@ -44,21 +44,18 @@ Vector_3 calculate_polygon_normal(const std::vector<Point_3> &polygon_points) {
 }
 
 
-// Convert a normal vector to one of 8 orientations or "Horizontal"
+// Convert a normal vector to one of 8 orientations or "horizontal"
 std::string classify_orientation(const Vector_3 &normal) {
-    if (std::abs(normal.z()) > 0.95) // If Z is close to 1, it's horizontal
-        return "Horizontal";
+    if (std::abs(normal.z()) > 0.95) // If Z is close to 1, it's near vertical thus horizontal
+        return "horizontal";
 
-    // Compute azimuth
-    double angle_rad = std::atan2(normal.y(), normal.x());
+    // Compute azimuth in degrees, atan2(x, y) makes it clockwise from north.
+    double angle = std::atan2(normal.x(), normal.y()) * 180.0 / CGAL_PI;
+    if (angle < 0) angle += 360;
 
-    // Convert to degrees
-    double angle_deg = angle_rad * 180.0 / CGAL_PI;
-    if (angle_deg < 0) angle_deg += 360;
-
-    // Map angle to one of 8 directions
-    const char *directions[] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
-    int index = static_cast<int>((angle_deg + 22.5) / 45.0) % 8;
+    // Map the angle_deg to one of the 8 (given) compass directions
+    static const std::array<std::string, 8> directions = {"NE", "EN", "ES", "SE", "SW", "WS", "WN", "NW"};
+    int index = static_cast<int>(angle / 45.0) % 8;
     return directions[index];
 }
 
@@ -94,7 +91,7 @@ Point_2 project_point_to_local_plane(const Point_3 &p, const PlaneCoordinateSyst
     Vector_3 op = p - plane_cs.origin;
     double x = op * plane_cs.u;
     double y = op * plane_cs.v;
-    return Point_2(x, y);
+    return {x, y};
 }
 
 
@@ -116,30 +113,36 @@ double calculate_polygon_area(const std::vector<Point_3> &polygon_points,
                               const std::vector<std::vector<Point_3> > &inner_rings) {
     PlaneCoordinateSystem plane_cs = compute_plane_coordinate_system(polygon_points);
     std::vector<Point_2> outer_ring_2d, inner_ring_2d;
+
+    // Project the outer ring to the local plane.
     for (const auto &p: polygon_points)
         outer_ring_2d.push_back(project_point_to_local_plane(p, plane_cs));
 
     // Compute the bounding box of the 2D projected outer ring and do -1 for both coordinates.
     CGAL::Bbox_2 bbox = CGAL::bounding_box(outer_ring_2d.begin(), outer_ring_2d.end()).bbox();
-    Point_2 triangulation_origin_2d(bbox.xmin() - 1.0, bbox.ymin() - 1.0);
+    Point_2 origin_2d(bbox.xmin() - 1.0, bbox.ymin() - 1.0);
 
     // Make sure that the area of the outer ring is positive, in case its orientation is wrong.
-    double area = std::abs(signed_area(outer_ring_2d, triangulation_origin_2d));
+    double area = std::abs(signed_area(outer_ring_2d, origin_2d));
 
+    // Project the inner rings to the local plane.
     for (const auto &ring: inner_rings) {
         std::vector<Point_2> ring_2d;
         for (const auto &p: ring)
             ring_2d.push_back(project_point_to_local_plane(p, plane_cs));
-        area -= std::abs(signed_area(ring_2d, triangulation_origin_2d)); // To make sure hole areas are negative.
+
+        // Subtract the area of the inner ring(s) from the total area.
+        // We make sure that the area is positive and then subtracted from the total area, since holes are negative.
+        area -= std::abs(signed_area(ring_2d, origin_2d));
     }
 
     return area;
 }
 
 
-RoofAnalysisResult analyse_roof_surface(
+std::pair<double, std::string> analyse_roof_surface(
     const std::vector<Point_3> &outer_ring,
-    const std::vector<std::vector<Point_3> > &inner_rings
+    const std::vector<std::vector<Point_3>> &inner_rings
 ) {
     Vector_3 normal = calculate_polygon_normal(outer_ring);
     std::string orientation = classify_orientation(normal);

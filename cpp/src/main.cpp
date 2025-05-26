@@ -29,18 +29,11 @@ using json = nlohmann::json;
 
 
 // Declarations
-int get_no_roof_surfaces(json &j);
-
 std::vector<std::array<double, 3> > get_vertices(json &j);
 
 void visit_roofsurfaces(json &j, const std::vector<std::array<double, 3> > &vertices);
 
-RoofAnalysisResult analyse_roof_surface(
-    const std::vector<Point_3> &outer_ring,
-    const std::vector<std::vector<Point_3> > &inner_rings
-);
-
-
+// Main function
 int main(int argc, const char *argv[]) {
     //-- will read the file passed as an argument or twobuildings.city.json if nothing is passed
     const char *filename = (argc > 1) ? argv[1] : "../../data/nextbk_2b.city.json";
@@ -50,10 +43,6 @@ int main(int argc, const char *argv[]) {
     json j;
     input >> j; //-- store the content of the file in a nlohmann::json object
     input.close();
-
-    //-- get the total number of RoofSurface in the file
-    int noroofsurfaces = get_no_roof_surfaces(j);
-    std::cout << "Total RoofSurface: " << noroofsurfaces << std::endl;
 
     auto vertices = get_vertices(j);
 
@@ -108,9 +97,9 @@ int main(int argc, const char *argv[]) {
 
 
 // Visit every 'RoofSurface' in the CityJSON model and print its vertices
-void visit_roofsurfaces(json &j, const std::vector<std::array<double, 3>> &vertices) {
+void visit_roofsurfaces(json &j, const std::vector<std::array<double, 3> > &vertices) {
     for (auto &co: j["CityObjects"].items()) {
-        std::string building_id = co.key();
+        const std::string &building_id = co.key();
         for (auto &g: co.value()["geometry"]) {
             std::string lod = g["lod"].get<std::string>();
             if (g["type"] == "Solid") {
@@ -142,13 +131,27 @@ void visit_roofsurfaces(json &j, const std::vector<std::array<double, 3>> &verti
                                 inner_rings.push_back(inner_ring);
                             }
 
+                            // Print outer ring
+                            std::cout << "Outer ring points:" << std::endl;
+                            for (const auto &p: outer_ring) {
+                                std::cout << "(" << p.x() << ", " << p.y() << ", " << p.z() << ")" << std::endl;
+                            }
+
+                            // Print inner rings
+                            for (size_t r = 0; r < inner_rings.size(); ++r) {
+                                std::cout << "Inner ring " << r << " points:" << std::endl;
+                                for (const auto &p: inner_rings[r]) {
+                                    std::cout << "(" << p.x() << ", " << p.y() << ", " << p.z() << ")" << std::endl;
+                                }
+                            }
+
                             // Big boy function
-                            RoofAnalysisResult result = analyse_roof_surface(outer_ring, inner_rings);
+                            auto [roof_area, roof_orientation] = analyse_roof_surface(outer_ring, inner_rings);
 
                             // Print results
                             std::cout << "Building: " << building_id << ", LoD: " << lod
-                                      << ", RoofSurface area: " << result.area << " m^2, "
-                                      << "orientation: " << result.orientation << std::endl;
+                                    << ", RoofSurface area: " << roof_area << " m^2, "
+                                    << "orientation: " << roof_orientation << std::endl;
                         }
                     }
                 }
@@ -158,35 +161,15 @@ void visit_roofsurfaces(json &j, const std::vector<std::array<double, 3>> &verti
 }
 
 
-// Returns all vertices transformed (scale + translate)
+// Returns all vertices scaled to their actual values, no translation necessary for our purposes.
 std::vector<std::array<double, 3> > get_vertices(json &j) {
     std::vector<std::array<double, 3> > transformed_vertices;
     for (auto &v: j["vertices"]) {
         std::vector<int> vi = v;
-        double x = (vi[0] * j["transform"]["scale"][0].get<double>()) + j["transform"]["translate"][0].get<double>();
-        double y = (vi[1] * j["transform"]["scale"][1].get<double>()) + j["transform"]["translate"][1].get<double>();
-        double z = (vi[2] * j["transform"]["scale"][2].get<double>()) + j["transform"]["translate"][2].get<double>();
+        double x = vi[0] * j["transform"]["scale"][0].get<double>();
+        double y = vi[1] * j["transform"]["scale"][1].get<double>();
+        double z = vi[2] * j["transform"]["scale"][2].get<double>();
         transformed_vertices.push_back({x, y, z});
     }
     return transformed_vertices;
-}
-
-// Count the total number of RoofSurfaces in the file
-int get_no_roof_surfaces(json &j) {
-    int count = 0;
-    for (auto &co: j["CityObjects"].items()) {
-        for (auto &g: co.value()["geometry"]) {
-            if (g["type"] == "Solid" && g.contains("semantics")) {
-                for (size_t i = 0; i < g["boundaries"].size(); i++) {
-                    for (size_t k = 0; k < g["boundaries"][i].size(); k++) {
-                        int sem_index = g["semantics"]["values"][i][k];
-                        if (g["semantics"]["surfaces"][sem_index]["type"].get<std::string>() == "RoofSurface") {
-                            count++;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    return count;
 }
