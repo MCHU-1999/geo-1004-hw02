@@ -84,10 +84,12 @@ int main(int argc, const char * argv[]) {
       if (!bld_mesh_from_json(j, child, mesh)) {
         // Error
         std::cerr << "Failed to convert building to mesh since this object doesn't have LoD >= 1.0" << std::endl;
+        continue;
       }
       if (!triangulate_mesh(mesh)) {
         // Error
         std::cerr << "Failed to triangulate mesh" << std::endl;
+        continue;
       }
       vol += volume_from_mesh(mesh);
     }
@@ -123,10 +125,10 @@ bool bld_mesh_from_json(json& j, std::string key, Mesh& mesh) {
         for (auto& shell : g.value()["boundaries"]) {
           for (auto& surface : shell) {
             for (auto& ring : surface) {
-              std::vector<CGAL::SM_Vertex_index> face_idx;
+              std::vector<CGAL::SM_Vertex_index> face_ids;
               for (auto& v : ring) {
                 if (index_map.find(v.get<int>()) != index_map.end()) {
-                  face_idx.push_back(index_map[v.get<int>()]);
+                  face_ids.push_back(index_map[v.get<int>()]);
                 } else {
                   CGAL::SM_Vertex_index idx = mesh.add_vertex(
                     Point_3(
@@ -136,10 +138,10 @@ bool bld_mesh_from_json(json& j, std::string key, Mesh& mesh) {
                     )
                   );
                   index_map[v.get<int>()] = idx;
-                  face_idx.push_back(idx);
+                  face_ids.push_back(idx);
                 }
               }
-              mesh.add_face(face_idx);
+              mesh.add_face(face_ids);
             }
           }
         }
@@ -208,14 +210,14 @@ FT tetrahedron_volume(const Point_3& a, const Point_3& b, const Point_3& c, cons
 }
 
 FT volume_from_mesh(const Mesh& mesh) {
-  const Point_3 o = *mesh.points().begin();
+  const Point_3& o = *mesh.points().begin();
   FT vol = 0.0;
 
   for (auto f: mesh.faces()) {
     auto it = CGAL::vertices_around_face(mesh.halfedge(f), mesh).begin();
-    const Point_3& a = mesh.point(*it); it++;
-    const Point_3& b = mesh.point(*it); it++;
-    const Point_3& c = mesh.point(*it);
+    const Point_3& a = mesh.point(*it);
+    const Point_3& b = mesh.point(*(++it));
+    const Point_3& c = mesh.point(*(++it));
 
     vol += tetrahedron_volume(a, b, c, o);
   }
