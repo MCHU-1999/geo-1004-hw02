@@ -51,6 +51,8 @@ double calculate_orientation_azimuth(const Vector_3 &normal) {
     return azimuth;
 }
 
+
+
 // Classify the orientation based on the azimuth
 std::string classify_orientation(const Vector_3 &normal) {
     double azimuth = calculate_orientation_azimuth(normal);
