@@ -37,5 +37,13 @@ include(CGAL_Eigen3_support)
 file(GLOB SRC_FILES src/*.cpp)
 add_executable(${PROJECT_NAME} ${SRC_FILES})
 
+# Explicitly add roof_calculations.cpp if it wasn't picked up by the glob
+if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/src/roof_calculations.cpp")
+  target_sources(${PROJECT_NAME} PRIVATE src/roof_calculations.cpp)
+endif()
+
 # Link libraries
 target_link_libraries(${PROJECT_NAME} CGAL::CGAL)
+if(TARGET CGAL::Eigen3_support)
+  target_link_libraries(${PROJECT_NAME} CGAL::Eigen3_support)
+endif()
