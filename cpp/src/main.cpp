@@ -42,9 +42,31 @@ typedef CGAL::Surface_mesh<Point_3>                             Mesh;
 namespace PMP = CGAL::Polygon_mesh_processing;
 
 // Declarations
-std::vector<std::array<double, 3> > get_vertices(json &j);
-void visit_roofsurfaces(json &j, const std::vector<std::array<double, 3> > &vertices);
-double compute_footprint_orientation(const json &j, const std::vector<std::array<double, 3> > &vertices);
+/**
+ * @brief Extracts and transforms 3D vertices from a JSON object.
+ * @param j A City JSON object
+ * 
+ * @return A vector of transformed 3D vertices as arrays of doubles.
+ */
+std::vector<std::array<double, 3>> get_vertices(json &j);
+
+/**
+ * @brief Visit roof surfaces and compute their orientation and area.
+ * @param j A City JSON object
+ * @param vertices A vector of transformed 3D vertices as arrays of doubles.
+ * 
+ * @return Nothing
+ */
+void roof_area_orientation(json &j, const std::vector<std::array<double, 3>> &vertices);
+
+/**
+ * @brief Visit and extract the dominant axis of the building using the LOD0 footprint, and write that as azimuth orientation.
+ * @param j A City JSON object
+ * @param vertices A vector of transformed 3D vertices as arrays of doubles.
+ * 
+ * @return Nothing
+ */
+void compute_footprint_orientation(const json &j, const std::vector<std::array<double, 3>> &vertices);
 
 
 // Main function
@@ -63,8 +85,7 @@ int main(int argc, const char *argv[]) {
 
   //-- get vertices from cityJSON
   auto vertices = get_vertices(j);
-  double footprint_orientation = compute_footprint_orientation(j, vertices);
-  std::cout << "Footprint orientation: " << footprint_orientation << " degrees\n";
+  compute_footprint_orientation(j, vertices);
 
   // Process roof surfaces to calculate area and orientation
   // Implementation of process_roof_surfaces function
@@ -86,9 +107,8 @@ int main(int argc, const char *argv[]) {
     }
   }
 
-  // For backward compatibility, still call the visit_roofsurfaces function
-  visit_roofsurfaces(j, vertices);
-
+  // For backward compatibility, still call the roof_area_orientation function
+  roof_area_orientation(j, vertices);
 
   //-- print out the number of Buildings in the file
   int nobuildings = 0;
@@ -135,7 +155,6 @@ int main(int argc, const char *argv[]) {
   return 0;
 }
 
-// Compute, based on the LOD0 footprint the dominant axis of the building, and return that as azimuth orientation.
 double compute_footprint_orientation(const json &j, const std::vector<std::array<double, 3> > &vertices) {
   for (const auto &co: j["CityObjects"].items()) {
     const std::string &building_id = co.key();
@@ -148,7 +167,7 @@ double compute_footprint_orientation(const json &j, const std::vector<std::array
       // Fallback to -1.0 if there is no footprint geometry to be found.
       if (!geom.contains("boundaries") || geom["boundaries"].empty() ||
           !geom["boundaries"][0].is_array() || geom["boundaries"][0].empty()) {
-        std::cout << "Building " << building_id << " has no valid LoD0 footprint.\n";
+        std::cerr << "Building " << building_id << " has no valid LoD0 footprint.\n";
         continue;
       }
 
@@ -185,8 +204,8 @@ double compute_footprint_orientation(const json &j, const std::vector<std::array
   return -1.0;
 }
 
-// Visit every 'RoofSurface' in the CityJSON model and print its vertices
-void visit_roofsurfaces(json &j, const std::vector<std::array<double, 3> > &vertices) {
+// Visit and extract the dominant axis of the building using the LOD0 footprint, and write that as azimuth orientation.
+void roof_area_orientation(json &j, const std::vector<std::array<double, 3> > &vertices) {
   for (auto &co: j["CityObjects"].items()) {
     const std::string &building_id = co.key();
     for (auto &g: co.value()["geometry"]) {
@@ -198,7 +217,6 @@ void visit_roofsurfaces(json &j, const std::vector<std::array<double, 3> > &vert
 
             // Get only the RoofSurfaces
             if (g["semantics"]["surfaces"][sem_index]["type"].get<std::string>() == "RoofSurface") {
-              // std::cout << "RoofSurface vertices:" << std::endl;
 
               // Extract outer ring points
               std::vector<Point_3> outer_ring;
@@ -238,9 +256,9 @@ void visit_roofsurfaces(json &j, const std::vector<std::array<double, 3> > &vert
               auto [roof_area, roof_orientation] = analyse_roof_surface(outer_ring, inner_rings);
 
               // Print results
-              // std::cout << "Building: " << building_id << ", LoD: " << lod
-              //     << ", RoofSurface area: " << roof_area << " m^2, "
-              //     << "orientation: " << roof_orientation << std::endl;
+              std::cout << "Building: " << building_id << ", LoD: " << lod
+                  << ", RoofSurface area: " << roof_area << " m^2, "
+                  << "orientation: " << roof_orientation << std::endl;
             }
           }
         }
@@ -248,7 +266,6 @@ void visit_roofsurfaces(json &j, const std::vector<std::array<double, 3> > &vert
     }
   }
 }
-
 
 // Returns all vertices scaled to their actual values, no translation necessary for our purposes.
 std::vector<std::array<double, 3> > get_vertices(json &j) {
