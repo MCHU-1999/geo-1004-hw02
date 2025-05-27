@@ -11,9 +11,6 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-
-#include <random>
-
 #include <vector>
 #include <array>
 
@@ -36,12 +33,13 @@
 //-- https://github.com/nlohmann/json
 //-- used to read and write (City)JSON
 #include "json.hpp" //-- it is in the /include/ folder
-#include "geometric_difference.h"
 using json = nlohmann::json;
 
 // including our functions
 #include "roof_calculations.h"
 #include "volume.h"
+#include "geometric_difference.h"
+
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel   Kernel;
 typedef CGAL::Polygon_2<Kernel>                            Polygon_2;
@@ -90,6 +88,14 @@ void compute_footprint_orientation(json &j, const std::vector<std::array<double,
  */
 void compute_volume(json &j);
 
+/**
+ * @brief Calculate and add an attribute "hausdorff_lod_22_13" into json object. 
+ * @param j A City JSON object
+ * 
+ * @return Nothing
+ */
+void compute_hausdorff(json &j);
+
 
 // Main function
 int main(int argc, const char *argv[]) {
@@ -125,13 +131,13 @@ int main(int argc, const char *argv[]) {
   //-- Calculate and add an attribute "volume"
   compute_volume(j);
 
+  //-- Calculate and add an attribute "hausdorff_lod_22_13"
+  compute_hausdorff(j);
+
   //-- write to disk the modified city model (out.city.json)
   std::ofstream o("out.city.json");
   o << j.dump(2) << std::endl;
   o.close();
-
-  std::cout << "\nOutput written to: out.city.json" << std::endl;
-  std::cout << "Visualization files (.ply) written to current directory" << std::endl;
 
   return 0;
 }
@@ -279,6 +285,94 @@ void compute_volume(json &j){
     vol = vol * scale[0] * scale[1] * scale[2];
     // std::cout << "Volume for object " << co.key() << ": " << vol << std::endl;
     co.value()["attributes"]["volume"] = vol;
+  }
+}
+
+// Function to get mesh for specific LoD
+bool get_mesh_for_lod(json& j, const std::string& building_key, const std::string& target_lod, Mesh& mesh) {
+  std::vector<std::vector<int>> vertices = j["vertices"].get<std::vector<std::vector<int>>>();
+  std::unordered_map<int, CGAL::SM_Vertex_index> index_map;
+
+  // Look for the specific LoD
+  for (auto& g: j["CityObjects"][building_key]["geometry"].items()) {
+    if (g.value()["lod"] == target_lod) {
+      mesh.clear();
+      for (auto& shell : g.value()["boundaries"]) {
+        for (auto& surface : shell) {
+          for (auto& ring : surface) {
+            std::vector<CGAL::SM_Vertex_index> face_idx;
+            for (auto& v : ring) {
+              if (index_map.find(v.get<int>()) != index_map.end()) {
+                face_idx.push_back(index_map[v.get<int>()]);
+              } else {
+                CGAL::SM_Vertex_index idx = mesh.add_vertex(
+                    Point_3(
+                        vertices[v.get<int>()][0],
+                        vertices[v.get<int>()][1],
+                        vertices[v.get<int>()][2]
+                    )
+                );
+                index_map[v.get<int>()] = idx;
+                face_idx.push_back(idx);
+              }
+            }
+            mesh.add_face(face_idx);
+          }
+        }
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+// calculate geometric difference (Hausdorff distance) between LoD 1.3 and LoD 2.2
+void compute_hausdorff(json &j) {
+  const std::vector<double> &scale = j["transform"]["scale"].get<std::vector<double>>();
+
+  for (auto& co : j["CityObjects"].items()) {
+    if (co.value()["type"] != "Building" || !co.value().contains("children"))
+      continue;
+
+    const std::vector<std::string>& children = co.value()["children"].get<std::vector<std::string>>();
+
+    // Get LoD 1.3 and LoD 2.2 meshes
+    Mesh mesh_lod13, mesh_lod22;
+    bool has_lod13 = false, has_lod22 = false;
+
+    for (const auto& child : children) {
+      if (!has_lod13 && get_mesh_for_lod(j, child, "1.3", mesh_lod13)) {
+        triangulate_mesh(mesh_lod13);
+        has_lod13 = true;
+      }
+      if (!has_lod22 && get_mesh_for_lod(j, child, "2.2", mesh_lod22)) {
+        triangulate_mesh(mesh_lod22);
+        has_lod22 = true;
+      }
+    }
+
+    if (has_lod13 && has_lod22) {
+      // Sample points from both meshes
+      std::vector<Point_3> points_lod13 = sample_points_from_mesh(mesh_lod13, 1000);
+      std::vector<Point_3> points_lod22 = sample_points_from_mesh(mesh_lod22, 1000);
+
+      // ADD THESE LINES - Export visualization files
+      // export_points_to_ply(points_lod13, co.key() + "_lod13_points.ply");
+      // export_points_to_ply(points_lod22, co.key() + "_lod22_points.ply");
+      // export_combined_points_to_ply(points_lod13, points_lod22, co.key() + "_combined_points.ply");
+
+      // Calculate Hausdorff distance
+      FT hausdorff_dist = hausdorff_distance(points_lod13, points_lod22);
+
+      // apply scale transformation
+      hausdorff_dist = hausdorff_dist * scale[0]; // Assuming uniform scaling
+
+      std::cout << "Hausdorff distance for object " << co.key() << ": " << hausdorff_dist << std::endl;
+      co.value()["attributes"]["hausdorff_lod_22_13"] = CGAL::to_double(hausdorff_dist);
+    } else {
+      std::cout << "Warning: Could not find both LoD 1.3 and LoD 2.2 for object " << co.key() << std::endl;
+      co.value()["attributes"]["hausdorff_lod_22_13"] = -1.0; // Indicate missing data
+    }
   }
 }
 
