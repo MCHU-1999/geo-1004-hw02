@@ -4,7 +4,8 @@ const std::vector<std::string> lod_tier = {"2.2", "2.1", "2.0", "2", "1.3", "1.2
 
 // Function to get mesh for specific LoD
 bool get_mesh_for_lod(json& j, const std::string& building_key, const std::string& target_lod, Mesh& mesh) {
-  std::vector<std::vector<int>> vertices = j["vertices"].get<std::vector<std::vector<int>>>();
+  std::vector<std::array<int, 3>> vertices = j["vertices"].get<std::vector<std::array<int, 3>>>();
+  const std::array<double, 3> &scale = j["transform"]["scale"].get<std::array<double, 3>>();
   std::unordered_map<int, CGAL::SM_Vertex_index> index_map;
 
   // Look for the specific LoD
@@ -21,9 +22,9 @@ bool get_mesh_for_lod(json& j, const std::string& building_key, const std::strin
               } else {
                 CGAL::SM_Vertex_index idx = mesh.add_vertex(
                     Point_3(
-                        vertices[v.get<int>()][0],
-                        vertices[v.get<int>()][1],
-                        vertices[v.get<int>()][2]
+                        vertices[v.get<int>()][0] * scale[0],
+                        vertices[v.get<int>()][1] * scale[1],
+                        vertices[v.get<int>()][2] * scale[2]
                     )
                 );
                 index_map[v.get<int>()] = idx;
