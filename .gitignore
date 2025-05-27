@@ -1,5 +1,6 @@
 .vscode/
 build/
+.idea/
 cpp/.idea/
 cpp/.vscode/
 cpp/build/
