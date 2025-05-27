@@ -27,12 +27,13 @@
 #include <CGAL/IO/Polyhedron_iostream.h>
 #include <CGAL/property_map.h>
 
-
+#include <unordered_map>
 
 
 //-- https://github.com/nlohmann/json
 //-- used to read and write (City)JSON
 #include "json.hpp" //-- it is in the /include/ folder
+#include "geometric_difference.h"
 
 using json = nlohmann::json;
 
@@ -53,20 +54,17 @@ FT volume_from_mesh(const Mesh& mesh);
 const std::vector<std::string> lod_tier = {"2.2", "2.1", "2.0", "2", "1.3", "1.2", "1.1", "1.0", "1"};
 
 // Declarations for geometric difference
-std::vector<Point_3> sample_points_from_mesh(const Mesh& mesh, int num_samples = 1000);
-FT hausdorff_distance(const std::vector<Point_3>& set_a, const std::vector<Point_3>& set_b);
-bool get_mesh_for_lod(json& j, const std::string& building_key, const std::string& target_lod, Mesh& mesh);
+// Function declarations
 
-// Visualization functions
-void export_points_to_ply(const std::vector<Point_3>& points, const std::string& filename);
-void export_combined_points_to_ply(const std::vector<Point_3>& points_lod13,
-                                   const std::vector<Point_3>& points_lod22,
-                                   const std::string& filename);
+FT    tetrahedron_volume(const Point_3& a, const Point_3& b, const Point_3& c, const Point_3& o);
+bool  get_mesh_for_lod(json& j, const std::string& building_key, const std::string& target_lod, Mesh& mesh);
+
 
 
 int main(int argc, const char * argv[]) {
   //-- will read the file passed as argument or twobuildings.city.json if nothing is passed
   const char* filename = (argc > 1) ? argv[1] : "../../data/nextbk_2b.city.json";
+  // const char* filename = (argc > 1) ? argv[1] : "../../data/9-284-556.city.json";
   std::cout << "Processing: " << filename << std::endl;
   std::ifstream input(filename);
   json j;
@@ -149,6 +147,11 @@ int main(int argc, const char * argv[]) {
       std::vector<Point_3> points_lod13 = sample_points_from_mesh(mesh_lod13, 1000);
       std::vector<Point_3> points_lod22 = sample_points_from_mesh(mesh_lod22, 1000);
 
+      // ADD THESE LINES - Export visualization files
+      export_points_to_ply(points_lod13, co.key() + "_lod13_points.ply");
+      export_points_to_ply(points_lod22, co.key() + "_lod22_points.ply");
+      export_combined_points_to_ply(points_lod13, points_lod22, co.key() + "_combined_points.ply");
+
       // Calculate Hausdorff distance
       FT hausdorff_dist = hausdorff_distance(points_lod13, points_lod22);
 
@@ -167,6 +170,9 @@ int main(int argc, const char * argv[]) {
   std::ofstream o("out.city.json");
   o << j.dump(2) << std::endl;
   o.close();
+
+  std::cout << "\nOutput written to: out.city.json" << std::endl;
+  std::cout << "Visualization files (.ply) written to current directory" << std::endl;
 
   return 0;
 }
@@ -329,6 +335,45 @@ int get_no_roof_surfaces(json &j) {
   }
   return total;
 }
+
+// Function to get mesh for specific LoD
+bool get_mesh_for_lod(json& j, const std::string& building_key, const std::string& target_lod, Mesh& mesh) {
+  std::vector<std::vector<int>> vertices = j["vertices"].get<std::vector<std::vector<int>>>();
+  std::unordered_map<int, CGAL::SM_Vertex_index> index_map;
+
+  // Look for the specific LoD
+  for (auto& g: j["CityObjects"][building_key]["geometry"].items()) {
+    if (g.value()["lod"] == target_lod) {
+      mesh.clear();
+      for (auto& shell : g.value()["boundaries"]) {
+        for (auto& surface : shell) {
+          for (auto& ring : surface) {
+            std::vector<CGAL::SM_Vertex_index> face_idx;
+            for (auto& v : ring) {
+              if (index_map.find(v.get<int>()) != index_map.end()) {
+                face_idx.push_back(index_map[v.get<int>()]);
+              } else {
+                CGAL::SM_Vertex_index idx = mesh.add_vertex(
+                    Point_3(
+                        vertices[v.get<int>()][0],
+                        vertices[v.get<int>()][1],
+                        vertices[v.get<int>()][2]
+                    )
+                );
+                index_map[v.get<int>()] = idx;
+                face_idx.push_back(idx);
+              }
+            }
+            mesh.add_face(face_idx);
+          }
+        }
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
 
 
 // CityJSON files have their vertices compressed: https://www.cityjson.org/specs/1.1.1/#transform-object
