@@ -51,8 +51,6 @@ double calculate_orientation_azimuth(const Vector_3 &normal) {
     return azimuth;
 }
 
-
-
 // Classify the orientation based on the azimuth
 std::string classify_orientation(const Vector_3 &normal) {
     double azimuth = calculate_orientation_azimuth(normal);
@@ -99,7 +97,6 @@ Point_2 project_point_to_local_plane(const Point_3 &p, const PlaneCoordinateSyst
     return {x, y};
 }
 
-
 // Helper function to calculate the signed area of a ring.
 // A Counter-Clockwise (CCW) ring yields a positive area, while a CW ring yields a negative area.
 double signed_area(const std::vector<Point_2> &ring, const Point_2 &origin) {
@@ -111,7 +108,6 @@ double signed_area(const std::vector<Point_2> &ring, const Point_2 &origin) {
     }
     return area;
 }
-
 
 // Combining the functions above to calculate the area of a polygon.
 double calculate_polygon_area(const std::vector<Point_3> &polygon_points,
@@ -143,7 +139,6 @@ double calculate_polygon_area(const std::vector<Point_3> &polygon_points,
 
     return area;
 }
-
 
 std::pair<double, std::string> analyse_roof_surface(
     const std::vector<Point_3> &outer_ring,
