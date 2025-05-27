@@ -1,66 +1,52 @@
-#include <iostream>
-#include <string>
-#include <vector>
-#include <array>
-
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
-#include <CGAL/Surface_mesh.h>
-#include <CGAL/Polygon_mesh_processing/triangulate_faces.h>
-#include <CGAL/boost/graph/helpers.h>
-
-//-- https://github.com/nlohmann/json
-//-- used to read and write (City)JSON
-#include "json.hpp" //-- it is in the /include/ folder
-using json = nlohmann::json;
-
-typedef CGAL::Exact_predicates_inexact_constructions_kernel   Kernel;
-typedef Kernel::FT                                                FT;
-typedef Kernel::Point_3                                      Point_3;
-typedef CGAL::Surface_mesh<Point_3>                             Mesh;
-
-namespace PMP = CGAL::Polygon_mesh_processing;
+#include "volume.h"
 
 const std::vector<std::string> lod_tier = {"2.2", "2.1", "2.0", "2", "1.3", "1.2", "1.1", "1.0", "1"};
 
-bool bld_mesh_from_json(json &j, std::string key, Mesh &mesh) {
-  std::vector<std::vector<int> > vertices = j["vertices"].get<std::vector<std::vector<int> > >();
+// Function to get mesh for specific LoD
+bool get_mesh_for_lod(json& j, const std::string& building_key, const std::string& target_lod, Mesh& mesh) {
+  std::vector<std::vector<int>> vertices = j["vertices"].get<std::vector<std::vector<int>>>();
   std::unordered_map<int, CGAL::SM_Vertex_index> index_map;
 
+  // Look for the specific LoD
+  for (auto& g: j["CityObjects"][building_key]["geometry"].items()) {
+    if (g.value()["lod"] == target_lod) {
+      mesh.clear();
+      for (auto& shell : g.value()["boundaries"]) {
+        for (auto& surface : shell) {
+          for (auto& ring : surface) {
+            std::vector<CGAL::SM_Vertex_index> face_idx;
+            for (auto& v : ring) {
+              if (index_map.find(v.get<int>()) != index_map.end()) {
+                face_idx.push_back(index_map[v.get<int>()]);
+              } else {
+                CGAL::SM_Vertex_index idx = mesh.add_vertex(
+                    Point_3(
+                        vertices[v.get<int>()][0],
+                        vertices[v.get<int>()][1],
+                        vertices[v.get<int>()][2]
+                    )
+                );
+                index_map[v.get<int>()] = idx;
+                face_idx.push_back(idx);
+              }
+            }
+            mesh.add_face(face_idx);
+          }
+        }
+      }
+      return true;
+    }
+  }
+  // Nothing is found, return false
+  return false;
+}
+
+bool mesh_from_json(json &j, std::string key, Mesh &mesh) {
   for (size_t i = 0; i < lod_tier.size(); i++) {
     if (i > 0) {
       std::cout << "LoD " << lod_tier[i - 1] << " not found, using LoD " << lod_tier[i] << " instead." << std::endl;
     }
-    const std::string &lod = lod_tier[i];
-
-    for (auto &g: j["CityObjects"][key]["geometry"].items()) {
-      if (g.value()["lod"] == lod) {
-        mesh.clear();
-        for (auto &shell: g.value()["boundaries"]) {
-          for (auto &surface: shell) {
-            for (auto &ring: surface) {
-              std::vector<CGAL::SM_Vertex_index> face_ids;
-              for (auto &v: ring) {
-                if (index_map.find(v.get<int>()) != index_map.end()) {
-                  face_ids.push_back(index_map[v.get<int>()]);
-                } else {
-                  CGAL::SM_Vertex_index idx = mesh.add_vertex(
-                    Point_3(
-                      vertices[v.get<int>()][0],
-                      vertices[v.get<int>()][1],
-                      vertices[v.get<int>()][2]
-                    )
-                  );
-                  index_map[v.get<int>()] = idx;
-                  face_ids.push_back(idx);
-                }
-              }
-              mesh.add_face(face_ids);
-            }
-          }
-        }
-        return true;
-      }
-    }
+    if (get_mesh_for_lod(j, key, lod_tier[i], mesh)) return true;
   }
 
   // Nothing is found, return false

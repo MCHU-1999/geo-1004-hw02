@@ -13,20 +13,12 @@
 #include <string>
 #include <vector>
 #include <array>
+#include <unordered_map>
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/Polygon_mesh_processing/triangulate_faces.h>
 #include <CGAL/boost/graph/helpers.h>
-
-
-// Add these includes to your existing code
-#include <CGAL/IO/write_ply_points.h>
-#include <CGAL/IO/write_xyz_points.h>
-#include <CGAL/IO/Polyhedron_iostream.h>
-#include <CGAL/property_map.h>
-
-#include <unordered_map>
 #include <CGAL/Min_quadrilateral_2.h>
 #include <CGAL/Polygon_2.h>
 
@@ -269,7 +261,7 @@ void compute_volume(json &j){
     Mesh mesh;
     FT vol = 0.0;
     for (auto &child: children) {
-      if (!bld_mesh_from_json(j, child, mesh)) {
+      if (!mesh_from_json(j, child, mesh)) {
         // Error
         std::cerr << "Failed to convert building to mesh since this object doesn't have LoD >= 1.0" << std::endl;
         continue;
@@ -288,43 +280,6 @@ void compute_volume(json &j){
   }
 }
 
-// Function to get mesh for specific LoD
-bool get_mesh_for_lod(json& j, const std::string& building_key, const std::string& target_lod, Mesh& mesh) {
-  std::vector<std::vector<int>> vertices = j["vertices"].get<std::vector<std::vector<int>>>();
-  std::unordered_map<int, CGAL::SM_Vertex_index> index_map;
-
-  // Look for the specific LoD
-  for (auto& g: j["CityObjects"][building_key]["geometry"].items()) {
-    if (g.value()["lod"] == target_lod) {
-      mesh.clear();
-      for (auto& shell : g.value()["boundaries"]) {
-        for (auto& surface : shell) {
-          for (auto& ring : surface) {
-            std::vector<CGAL::SM_Vertex_index> face_idx;
-            for (auto& v : ring) {
-              if (index_map.find(v.get<int>()) != index_map.end()) {
-                face_idx.push_back(index_map[v.get<int>()]);
-              } else {
-                CGAL::SM_Vertex_index idx = mesh.add_vertex(
-                    Point_3(
-                        vertices[v.get<int>()][0],
-                        vertices[v.get<int>()][1],
-                        vertices[v.get<int>()][2]
-                    )
-                );
-                index_map[v.get<int>()] = idx;
-                face_idx.push_back(idx);
-              }
-            }
-            mesh.add_face(face_idx);
-          }
-        }
-      }
-      return true;
-    }
-  }
-  return false;
-}
 
 // calculate geometric difference (Hausdorff distance) between LoD 1.3 and LoD 2.2
 void compute_hausdorff(json &j) {
