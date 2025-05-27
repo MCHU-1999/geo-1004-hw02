@@ -12,10 +12,22 @@
 #include <fstream>
 #include <string>
 
+#include <random>
+
+
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/Polygon_mesh_processing/triangulate_faces.h>
 #include <CGAL/boost/graph/helpers.h>
+
+
+// Add these includes to your existing code
+#include <CGAL/IO/write_ply_points.h>
+#include <CGAL/IO/write_xyz_points.h>
+#include <CGAL/IO/Polyhedron_iostream.h>
+#include <CGAL/property_map.h>
+
+
 
 
 //-- https://github.com/nlohmann/json
@@ -39,6 +51,17 @@ bool bld_mesh_from_json(json& j, std::string key, Mesh& mesh);
 bool triangulate_mesh(Mesh& mesh, bool verbose=false);
 FT volume_from_mesh(const Mesh& mesh);
 const std::vector<std::string> lod_tier = {"2.2", "2.1", "2.0", "2", "1.3", "1.2", "1.1", "1.0", "1"};
+
+// Declarations for geometric difference
+std::vector<Point_3> sample_points_from_mesh(const Mesh& mesh, int num_samples = 1000);
+FT hausdorff_distance(const std::vector<Point_3>& set_a, const std::vector<Point_3>& set_b);
+bool get_mesh_for_lod(json& j, const std::string& building_key, const std::string& target_lod, Mesh& mesh);
+
+// Visualization functions
+void export_points_to_ply(const std::vector<Point_3>& points, const std::string& filename);
+void export_combined_points_to_ply(const std::vector<Point_3>& points_lod13,
+                                   const std::vector<Point_3>& points_lod22,
+                                   const std::string& filename);
 
 
 int main(int argc, const char * argv[]) {
@@ -95,6 +118,49 @@ int main(int argc, const char * argv[]) {
     vol = vol * scale[0] * scale[1] * scale[2];
     std::cout << "Volume for object " << co.key() << ": " << vol << std::endl;
     co.value()["attributes"]["volume"] = vol;
+  }
+
+
+
+  // calculate geometric difference (Hausdorff distance) between LoD 1.3 and LoD 2.2
+  for (auto& co : j["CityObjects"].items()) {
+    if (co.value()["type"] != "Building" || !co.value().contains("children"))
+      continue;
+
+    const std::vector<std::string>& children = co.value()["children"].get<std::vector<std::string>>();
+
+    // Get LoD 1.3 and LoD 2.2 meshes
+    Mesh mesh_lod13, mesh_lod22;
+    bool has_lod13 = false, has_lod22 = false;
+
+    for (const auto& child : children) {
+      if (!has_lod13 && get_mesh_for_lod(j, child, "1.3", mesh_lod13)) {
+        triangulate_mesh(mesh_lod13);
+        has_lod13 = true;
+      }
+      if (!has_lod22 && get_mesh_for_lod(j, child, "2.2", mesh_lod22)) {
+        triangulate_mesh(mesh_lod22);
+        has_lod22 = true;
+      }
+    }
+
+    if (has_lod13 && has_lod22) {
+      // Sample points from both meshes
+      std::vector<Point_3> points_lod13 = sample_points_from_mesh(mesh_lod13, 1000);
+      std::vector<Point_3> points_lod22 = sample_points_from_mesh(mesh_lod22, 1000);
+
+      // Calculate Hausdorff distance
+      FT hausdorff_dist = hausdorff_distance(points_lod13, points_lod22);
+
+      // apply scale transformation
+      hausdorff_dist = hausdorff_dist * scale[0]; // Assuming uniform scaling
+
+      std::cout << "Hausdorff distance for object " << co.key() << ": " << hausdorff_dist << std::endl;
+      co.value()["attributes"]["geometric_difference"] = CGAL::to_double(hausdorff_dist);
+    } else {
+      std::cout << "Warning: Could not find both LoD 1.3 and LoD 2.2 for object " << co.key() << std::endl;
+      co.value()["attributes"]["geometric_difference"] = -1.0; // Indicate missing data
+    }
   }
 
   //-- write to disk the modified city model (out.city.json)
@@ -290,3 +356,6 @@ void list_all_vertices(json& j) {
     }
   }
 }
+
+
+
