@@ -51,13 +51,13 @@ namespace PMP = CGAL::Polygon_mesh_processing;
 std::vector<std::array<double, 3>> get_vertices(json &j);
 
 /**
- * @brief Visit roof surfaces and compute their orientation and area.
+ * @brief Visit roof surfaces and compute their orientation and area, and write that into json object.
  * @param j A City JSON object
  * @param vertices A vector of transformed 3D vertices as arrays of doubles.
  * 
  * @return Nothing
  */
-void roof_area_orientation(json &j, const std::vector<std::array<double, 3>> &vertices);
+void compute_roof_area_orientation(json &j, const std::vector<std::array<double, 3>> &vertices);
 
 /**
  * @brief Visit and extract the dominant axis of the building using the LOD0 footprint, and write that as azimuth orientation.
@@ -66,14 +66,23 @@ void roof_area_orientation(json &j, const std::vector<std::array<double, 3>> &ve
  * 
  * @return Nothing
  */
-void compute_footprint_orientation(const json &j, const std::vector<std::array<double, 3>> &vertices);
+void compute_footprint_orientation(json &j, const std::vector<std::array<double, 3>> &vertices);
+
+/**
+ * @brief Calculate and add an attribute "volume" into json object. 
+ * @param j A City JSON object
+ * @param vertices A vector of transformed 3D vertices as arrays of doubles.
+ * 
+ * @return Nothing
+ */
+void compute_volume(json &j);
 
 
 // Main function
 int main(int argc, const char *argv[]) {
   //-- will read the file passed as an argument or twobuildings.city.json if nothing is passed
   const char *filename = (argc > 1) ? argv[1] : "../../data/nextbk_2b.city.json";
-  // const char* filename = (argc > 1) ? argv[1] : "../../data/9-284-556.city.json";
+
   std::cout << "Processing: " << filename << std::endl;
   std::ifstream input(filename);
   json j;
@@ -81,71 +90,27 @@ int main(int argc, const char *argv[]) {
   input.close();
 
   //-- get scale from cityJSON
-  const std::vector<double> &scale = j["transform"]["scale"].get<std::vector<double> >();
+  const std::vector<double> &scale = j["transform"]["scale"].get<std::vector<double>>();
 
   //-- get vertices from cityJSON
   auto vertices = get_vertices(j);
-  compute_footprint_orientation(j, vertices);
-
-  // Process roof surfaces to calculate area and orientation
-  // Implementation of process_roof_surfaces function
-  for (auto &co: j["CityObjects"].items()) {
-    for (auto &g: co.value()["geometry"]) {
-      if (g["type"] == "Solid" && g.contains("semantics")) {
-        for (size_t i = 0; i < g["boundaries"].size(); i++) {
-          for (size_t k = 0; k < g["boundaries"][i].size(); k++) {
-            int sem_index = g["semantics"]["values"][i][k];
-
-            // Get only the RoofSurfaces
-            if (g["semantics"]["surfaces"][sem_index]["type"].get<std::string>() == "RoofSurface") {
-              // Add roof analysis attributes to the semantic surface
-              g["semantics"]["surfaces"][sem_index]["attributes"]["processed"] = true;
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // For backward compatibility, still call the roof_area_orientation function
-  roof_area_orientation(j, vertices);
 
   //-- print out the number of Buildings in the file
   int nobuildings = 0;
   for (auto &co: j["CityObjects"]) {
-    if (co["type"] == "Building") {
-      nobuildings += 1;
-    }
+    if (co["type"] == "Building") nobuildings += 1;
   }
   std::cout << "There are " << nobuildings << " Buildings in the file" << std::endl;
   std::cout << "Number of vertices " << j["vertices"].size() << std::endl;
 
-  //-- add an attribute "volume"
-  for (auto &co: j["CityObjects"].items()) {
-    if (co.value()["type"] != "Building" || !co.value().contains("children"))
-      continue;
+  //-- Calculate and add an attribute "orientation"
+  compute_footprint_orientation(j, vertices);
 
-    const std::vector<std::string> &children = co.value()["children"].get<std::vector<std::string> >();
-    Mesh mesh;
-    FT vol = 0.0;
-    for (auto &child: children) {
-      if (!bld_mesh_from_json(j, child, mesh)) {
-        // Error
-        std::cerr << "Failed to convert building to mesh since this object doesn't have LoD >= 1.0" << std::endl;
-        continue;
-      }
-      if (!triangulate_mesh(mesh)) {
-        // Error
-        std::cerr << "Failed to triangulate mesh" << std::endl;
-        continue;
-      }
-      vol += volume_from_mesh(mesh);
-    }
+  //-- Calculate and add attributes "area" "orientation" into roofSurface
+  compute_roof_area_orientation(j, vertices);
 
-    vol = vol * scale[0] * scale[1] * scale[2];
-    std::cout << "Volume for object " << co.key() << ": " << vol << std::endl;
-    co.value()["attributes"]["volume"] = vol;
-  }
+  //-- Calculate and add an attribute "volume"
+  compute_volume(j);
 
   //-- write to disk the modified city model (out.city.json)
   std::ofstream o("out.city.json");
@@ -155,10 +120,10 @@ int main(int argc, const char *argv[]) {
   return 0;
 }
 
-double compute_footprint_orientation(const json &j, const std::vector<std::array<double, 3> > &vertices) {
-  for (const auto &co: j["CityObjects"].items()) {
-    const std::string &building_id = co.key();
-    const auto &obj = co.value();
+void compute_footprint_orientation(json &j, const std::vector<std::array<double, 3>> &vertices) {
+  for (auto &co: j["CityObjects"].items()) {
+    // const std::string &building_id = co.key();
+    auto &obj = co.value();
     if (obj["type"] != "Building") continue;
 
     for (const auto &geom: obj["geometry"]) {
@@ -167,7 +132,7 @@ double compute_footprint_orientation(const json &j, const std::vector<std::array
       // Fallback to -1.0 if there is no footprint geometry to be found.
       if (!geom.contains("boundaries") || geom["boundaries"].empty() ||
           !geom["boundaries"][0].is_array() || geom["boundaries"][0].empty()) {
-        std::cerr << "Building " << building_id << " has no valid LoD0 footprint.\n";
+        std::cerr << "Building " << co.key() << " has no valid LoD0 footprint.\n";
         continue;
       }
 
@@ -179,10 +144,9 @@ double compute_footprint_orientation(const json &j, const std::vector<std::array
         int index = v_index.get<int>();
         const auto &pt = vertices[index];
         footprint.push_back(Point_2(pt[0], pt[1]));
-        // std::cout << "(" << pt[0] << ", " << pt[1] << ")" << std::endl;
       }
 
-      // Using CGAL, compute the minimum rectangle
+      // compute the minimum rectangle
       std::vector<Point_2> p_m;
       CGAL::min_rectangle_2(footprint.vertices_begin(), footprint.vertices_end(), std::back_inserter(p_m));
 
@@ -192,22 +156,23 @@ double compute_footprint_orientation(const json &j, const std::vector<std::array
       Vector_2 v2 = p_m[2] - p_m[1];
       Vector_2 dominant_vec_2d = (v1.squared_length() > v2.squared_length()) ? v1 : v2; // All hail C++ if-statements.
 
-      if (dominant_vec_2d.y() < 0) dominant_vec_2d = -dominant_vec_2d; // Make sure it points upwards.
-
+      // Make sure it points upwards.
+      if (dominant_vec_2d.y() < 0) dominant_vec_2d = -dominant_vec_2d;
       Vector_3 dominant_vec_3d(dominant_vec_2d.x(), dominant_vec_2d.y(), 1);
 
       // Compute the azimuth for the overall building orientation
       double azimuth = calculate_orientation_azimuth(dominant_vec_3d);
-      std::cout << "Building " << building_id << " footprint orientation: " << azimuth << " degrees\n";
+      // std::cout << "Building " << co.key() << " footprint orientation: " << azimuth << " degrees\n";
+
+      // Write the footprint orientation
+      obj["attributes"]["orientation"] = azimuth;
     }
   }
-  return -1.0;
 }
 
 // Visit and extract the dominant axis of the building using the LOD0 footprint, and write that as azimuth orientation.
-void roof_area_orientation(json &j, const std::vector<std::array<double, 3> > &vertices) {
+void compute_roof_area_orientation(json &j, const std::vector<std::array<double, 3>> &vertices) {
   for (auto &co: j["CityObjects"].items()) {
-    const std::string &building_id = co.key();
     for (auto &g: co.value()["geometry"]) {
       std::string lod = g["lod"].get<std::string>();
       if (g["type"] == "Solid") {
@@ -227,7 +192,7 @@ void roof_area_orientation(json &j, const std::vector<std::array<double, 3> > &v
               }
 
               // Extract inner rings points (holes)
-              std::vector<std::vector<Point_3> > inner_rings;
+              std::vector<std::vector<Point_3>> inner_rings;
               for (size_t r = 1; r < g["boundaries"][i][k].size(); r++) {
                 std::vector<Point_3> inner_ring;
                 for (auto &v_idx: g["boundaries"][i][k][r]) {
@@ -256,9 +221,13 @@ void roof_area_orientation(json &j, const std::vector<std::array<double, 3> > &v
               auto [roof_area, roof_orientation] = analyse_roof_surface(outer_ring, inner_rings);
 
               // Print results
-              std::cout << "Building: " << building_id << ", LoD: " << lod
-                  << ", RoofSurface area: " << roof_area << " m^2, "
-                  << "orientation: " << roof_orientation << std::endl;
+              // std::cout << "Building: " << co.key() << ", LoD: " << lod
+              //     << ", RoofSurface area: " << roof_area << " m^2, "
+              //     << "orientation: " << roof_orientation << std::endl;
+              
+              // Write results
+              g["semantics"]["surfaces"][sem_index]["area"] = roof_area;
+              g["semantics"]["surfaces"][sem_index]["orientation"] = roof_orientation;
             }
           }
         }
@@ -267,9 +236,39 @@ void roof_area_orientation(json &j, const std::vector<std::array<double, 3> > &v
   }
 }
 
+void compute_volume(json &j){
+  const std::vector<double> &scale = j["transform"]["scale"].get<std::vector<double>>();
+  
+  for (auto &co: j["CityObjects"].items()) {
+    if (co.value()["type"] != "Building" || !co.value().contains("children"))
+      continue;
+
+    const std::vector<std::string> &children = co.value()["children"].get<std::vector<std::string>>();
+    Mesh mesh;
+    FT vol = 0.0;
+    for (auto &child: children) {
+      if (!bld_mesh_from_json(j, child, mesh)) {
+        // Error
+        std::cerr << "Failed to convert building to mesh since this object doesn't have LoD >= 1.0" << std::endl;
+        continue;
+      }
+      if (!triangulate_mesh(mesh)) {
+        // Error
+        std::cerr << "Failed to triangulate mesh" << std::endl;
+        continue;
+      }
+      vol += volume_from_mesh(mesh);
+    }
+
+    vol = vol * scale[0] * scale[1] * scale[2];
+    // std::cout << "Volume for object " << co.key() << ": " << vol << std::endl;
+    co.value()["attributes"]["volume"] = vol;
+  }
+}
+
 // Returns all vertices scaled to their actual values, no translation necessary for our purposes.
-std::vector<std::array<double, 3> > get_vertices(json &j) {
-  std::vector<std::array<double, 3> > transformed_vertices;
+std::vector<std::array<double, 3>> get_vertices(json &j) {
+  std::vector<std::array<double, 3>> transformed_vertices;
   for (auto &v: j["vertices"]) {
     std::vector<int> vi = v;
     double x = vi[0] * j["transform"]["scale"][0].get<double>();
