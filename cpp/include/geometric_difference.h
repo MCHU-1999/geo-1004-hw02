@@ -5,12 +5,14 @@
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Surface_mesh.h>
 
-typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
-typedef Kernel::Point_3 Point_3;
-typedef CGAL::Surface_mesh<Point_3> Mesh;
-typedef Kernel::FT FT;
+typedef CGAL::Exact_predicates_inexact_constructions_kernel  Kernel;
+typedef Kernel::Point_3                                     Point_3;
+typedef CGAL::Surface_mesh<Point_3>                            Mesh;
+typedef Kernel::FT                                               FT;
+typedef Kernel::Triangle_3                               Triangle_3;
 
 // Function declarations for geometric difference calculations
+std::vector<Point_3> sample_points_from_mesh_cgal(const Mesh& mesh, int pt_density = 100);
 std::vector<Point_3> sample_points_from_mesh(const Mesh& mesh, int num_samples = 1000);
 Point_3 sample_point_on_triangle(const Point_3& a, const Point_3& b, const Point_3& c);
 FT hausdorff_distance(const std::vector<Point_3>& set_a, const std::vector<Point_3>& set_b);

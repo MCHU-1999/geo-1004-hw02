@@ -250,9 +250,8 @@ void compute_roof_area_orientation(json &j, const std::vector<std::array<double,
   }
 }
 
+
 void compute_volume(json &j){
-  const std::vector<double> &scale = j["transform"]["scale"].get<std::vector<double>>();
-  
   for (auto &co: j["CityObjects"].items()) {
     if (co.value()["type"] != "Building" || !co.value().contains("children"))
       continue;
@@ -274,7 +273,6 @@ void compute_volume(json &j){
       vol += volume_from_mesh(mesh);
     }
 
-    vol = vol * scale[0] * scale[1] * scale[2];
     // std::cout << "Volume for object " << co.key() << ": " << vol << std::endl;
     co.value()["attributes"]["volume"] = vol;
   }
@@ -283,8 +281,6 @@ void compute_volume(json &j){
 
 // calculate geometric difference (Hausdorff distance) between LoD 1.3 and LoD 2.2
 void compute_hausdorff(json &j) {
-  const std::vector<double> &scale = j["transform"]["scale"].get<std::vector<double>>();
-
   for (auto& co : j["CityObjects"].items()) {
     if (co.value()["type"] != "Building" || !co.value().contains("children"))
       continue;
@@ -308,8 +304,8 @@ void compute_hausdorff(json &j) {
 
     if (has_lod13 && has_lod22) {
       // Sample points from both meshes
-      std::vector<Point_3> points_lod13 = sample_points_from_mesh(mesh_lod13, 1000);
-      std::vector<Point_3> points_lod22 = sample_points_from_mesh(mesh_lod22, 1000);
+      std::vector<Point_3> points_lod13 = sample_points_from_mesh_cgal(mesh_lod13, 25);
+      std::vector<Point_3> points_lod22 = sample_points_from_mesh_cgal(mesh_lod22, 25);
 
       // ADD THESE LINES - Export visualization files
       // export_points_to_ply(points_lod13, co.key() + "_lod13_points.ply");
@@ -318,9 +314,6 @@ void compute_hausdorff(json &j) {
 
       // Calculate Hausdorff distance
       FT hausdorff_dist = hausdorff_distance(points_lod13, points_lod22);
-
-      // apply scale transformation
-      hausdorff_dist = hausdorff_dist * scale[0]; // Assuming uniform scaling
 
       std::cout << "Hausdorff distance for object " << co.key() << ": " << hausdorff_dist << std::endl;
       co.value()["attributes"]["hausdorff_lod_22_13"] = CGAL::to_double(hausdorff_dist);
@@ -335,7 +328,7 @@ void compute_hausdorff(json &j) {
 std::vector<std::array<double, 3>> get_vertices(json &j) {
   std::vector<std::array<double, 3>> transformed_vertices;
   for (auto &v: j["vertices"]) {
-    std::vector<int> vi = v;
+    std::array<int, 3> vi = v;
     double x = vi[0] * j["transform"]["scale"][0].get<double>();
     double y = vi[1] * j["transform"]["scale"][1].get<double>();
     double z = vi[2] * j["transform"]["scale"][2].get<double>();

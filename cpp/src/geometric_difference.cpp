@@ -3,9 +3,38 @@
 #include <fstream>
 #include <iostream>
 #include <CGAL/Random.h>
+#include <CGAL/point_generators_3.h>
+
+typedef CGAL::Random_points_in_triangle_mesh_3<Mesh> Point_generator;
 
 // static CGAL random generator
 static CGAL::Random cgal_rand;  // This will be shared across all functions
+
+std::vector<Point_3> sample_points_from_mesh_cgal(const Mesh& mesh, int pt_density) {
+    std::vector<Point_3> sampled_points;
+    FT total_area = 0.0;
+    Point_generator generator(mesh, cgal_rand);
+
+    // calculate total area
+    for (auto f : mesh.faces()) {
+        auto it = CGAL::vertices_around_face(mesh.halfedge(f), mesh).begin();
+        const Point_3& a = mesh.point(*it);
+        const Point_3& b = mesh.point(*(++it));
+        const Point_3& c = mesh.point(*(++it));
+
+        // Calculate triangle area using cross product
+        Kernel::Vector_3 ab = b - a;
+        Kernel::Vector_3 ac = c - a;
+        Kernel::Vector_3 cross = CGAL::cross_product(ab, ac);
+        FT area = std::sqrt(cross.squared_length()) / 2.0;
+
+        total_area += area;
+    }
+    std::cout << "slow slow code bro\n";
+    std::copy_n(generator, static_cast<int>(total_area * pt_density), std::back_inserter(sampled_points));
+
+    return sampled_points;
+}
 
 // function to sample points uniformly on mesh surface
 std::vector<Point_3> sample_points_from_mesh(const Mesh& mesh, int num_samples) {
