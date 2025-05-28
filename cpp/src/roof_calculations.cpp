@@ -1,25 +1,5 @@
 #include "roof_calculations.h"
-#include <vector>
-#include <string>
 
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
-#include <CGAL/Polygon_2.h>
-#include <CGAL/Polygon_with_holes_2.h>
-#include <CGAL/bounding_box.h>
-
-typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
-typedef Kernel::Point_3 Point_3;
-typedef Kernel::Vector_3 Vector_3;
-typedef Kernel::Point_2 Point_2;
-typedef CGAL::Polygon_2<Kernel> Polygon_2;
-typedef CGAL::Polygon_with_holes_2<Kernel> Polygon_with_holes_2;
-
-struct PlaneCoordinateSystem {
-    Vector_3 normal;
-    Point_3 origin;
-    Vector_3 u; // local x-axis
-    Vector_3 v; // local y-axis
-};
 
 // Based on the cross-product algorithm as explained in my DTM course notes.
 Vector_3 calculate_polygon_normal(const std::vector<Point_3> &polygon_points) {
@@ -119,9 +99,8 @@ double calculate_polygon_area(const std::vector<Point_3> &polygon_points,
     for (const auto &p: polygon_points)
         outer_ring_2d.push_back(project_point_to_local_plane(p, plane_cs));
 
-    // Compute the bounding box of the 2D projected outer ring and do -1 for both coordinates.
-    CGAL::Bbox_2 bbox = CGAL::bounding_box(outer_ring_2d.begin(), outer_ring_2d.end()).bbox();
-    Point_2 origin_2d(bbox.xmin() - 1.0, bbox.ymin() - 1.0);
+    // Make origin point for area calculation, -1000 is far enough to always be outside roof.
+    Point_2 origin_2d(-1000, -1000);
 
     // Make sure that the area of the outer ring is positive, in case its orientation is wrong.
     double area = std::abs(signed_area(outer_ring_2d, origin_2d));

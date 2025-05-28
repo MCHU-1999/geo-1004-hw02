@@ -1,72 +1,133 @@
-#include <iostream>
-#include <string>
-#include <vector>
-#include <array>
-
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
-#include <CGAL/Surface_mesh.h>
-#include <CGAL/Polygon_mesh_processing/triangulate_faces.h>
-#include <CGAL/boost/graph/helpers.h>
-
-//-- https://github.com/nlohmann/json
-//-- used to read and write (City)JSON
-#include "json.hpp" //-- it is in the /include/ folder
-using json = nlohmann::json;
-
-typedef CGAL::Exact_predicates_inexact_constructions_kernel   Kernel;
-typedef Kernel::FT                                                FT;
-typedef Kernel::Point_3                                      Point_3;
-typedef CGAL::Surface_mesh<Point_3>                             Mesh;
-
-namespace PMP = CGAL::Polygon_mesh_processing;
+#include "volume.h"
 
 const std::vector<std::string> lod_tier = {"2.2", "2.1", "2.0", "2", "1.3", "1.2", "1.1", "1.0", "1"};
 
-bool bld_mesh_from_json(json &j, std::string key, Mesh &mesh) {
-  std::vector<std::vector<int> > vertices = j["vertices"].get<std::vector<std::vector<int> > >();
+struct Point2Compare {
+  static constexpr double EPSILON = 1e-9;
+  
+  bool operator()(const Point_2& a, const Point_2& b) const {
+    if (std::abs(a.x() - b.x()) > EPSILON) {
+      return a.x() < b.x();
+    }
+    return a.y() < b.y() - EPSILON;
+  }
+};
+
+// Function to get mesh for specific LoD
+bool get_mesh_for_lod(json& j, const std::string& building_key, const std::string& target_lod, Mesh& mesh) {
+  std::vector<std::array<int, 3>> vertices = j["vertices"].get<std::vector<std::array<int, 3>>>();
+  const std::array<double, 3> &scale = j["transform"]["scale"].get<std::array<double, 3>>();
   std::unordered_map<int, CGAL::SM_Vertex_index> index_map;
 
+  // Look for the specific LoD
+  for (auto& g: j["CityObjects"][building_key]["geometry"].items()) {
+    if (g.value()["lod"] == target_lod) {
+      mesh.clear();
+      for (auto& shell : g.value()["boundaries"]) {
+        for (auto& surface : shell) {
+          if (surface.size() > 1) {
+            // Oh shoot we have a hole here
+            // construct 2+ non-intersecting nested polygons
+            std::vector<Point_3> outer_ring_3;
+            for (auto& v : surface[0]) {
+              outer_ring_3.push_back(
+                Point_3(
+                  vertices[v.get<int>()][0] * scale[0],
+                  vertices[v.get<int>()][1] * scale[1],
+                  vertices[v.get<int>()][2] * scale[2]
+                )
+              );
+            }
+
+            // Create a local PlaneCoordinateSystem
+            const PlaneCoordinateSystem& plane_cs = compute_plane_coordinate_system(outer_ring_3);
+
+            // Map Point_2 to CGAL::SM_Vertex_index for later use
+            std::map<Point_2, CGAL::SM_Vertex_index, Point2Compare> point_lift_map;
+
+            std::vector<Polygon_2> all_rings;
+            for (size_t i = 0; i < surface.size(); i++) {
+              Polygon_2 ring_2;
+              for (auto& v : surface[i]) {
+                CGAL::SM_Vertex_index vertex_idx;
+                if (index_map.find(v.get<int>()) == index_map.end()) {
+                  vertex_idx = mesh.add_vertex(
+                    Point_3(
+                      vertices[v.get<int>()][0] * scale[0],
+                      vertices[v.get<int>()][1] * scale[1],
+                      vertices[v.get<int>()][2] * scale[2]
+                    )
+                  );
+                  index_map[v.get<int>()] = vertex_idx;
+                } else {
+                  vertex_idx = index_map[v.get<int>()];
+                }
+                Point_2 projected = project_point_to_local_plane(mesh.point(vertex_idx), plane_cs);
+                point_lift_map.insert({projected, vertex_idx});
+                ring_2.push_back(projected);
+              }
+              all_rings.push_back(ring_2);
+            }
+
+            // Insert the polygons into a constrained triangulation
+            CT ct;
+            for (auto& polygon : all_rings) {
+              ct.insert_constraint(polygon.vertices_begin(), polygon.vertices_end(), true);
+            }
+
+            // Take out the triangles, map to mesh_pt_id and add faces into mesh
+            for (auto fit = ct.finite_faces_begin(); fit != ct.finite_faces_end(); ++fit) {
+              // if (!ct.is_i is_in_domain(fit)) continue;  // Skip triangles outside
+              
+              std::vector<CGAL::SM_Vertex_index> tri_idx;
+              for (int i = 0; i < 3; ++i) {
+                Point_2 &p2 = fit->vertex(i)->point();
+                tri_idx.push_back(point_lift_map[p2]);
+                // std::cout << "id=" << point_lift_map[p2] << "\n";
+              }
+              mesh.add_face(tri_idx);
+            }
+          } else {
+            std::vector<CGAL::SM_Vertex_index> vertex_ids;
+            for (auto& ring : surface) {
+              for (auto& v : ring) {
+                if (index_map.find(v.get<int>()) != index_map.end()) {
+                  vertex_ids.push_back(index_map[v.get<int>()]);
+                } else {
+                  CGAL::SM_Vertex_index vertex_idx = mesh.add_vertex(
+                    Point_3(
+                      vertices[v.get<int>()][0] * scale[0],
+                      vertices[v.get<int>()][1] * scale[1],
+                      vertices[v.get<int>()][2] * scale[2]
+                    )
+                  );
+                  index_map[v.get<int>()] = vertex_idx;
+                  vertex_ids.push_back(vertex_idx);
+                }
+              }
+              mesh.add_face(vertex_ids);
+            }
+          }
+        }
+      }
+      return true;
+    }
+  }
+  // Nothing is found, return false
+  return false;
+}
+
+bool mesh_from_json(json &j, std::string key, Mesh &mesh) {
   for (size_t i = 0; i < lod_tier.size(); i++) {
     if (i > 0) {
       std::cout << "LoD " << lod_tier[i - 1] << " not found, using LoD " << lod_tier[i] << " instead." << std::endl;
     }
-    const std::string &lod = lod_tier[i];
-
-    for (auto &g: j["CityObjects"][key]["geometry"].items()) {
-      if (g.value()["lod"] == lod) {
-        mesh.clear();
-        for (auto &shell: g.value()["boundaries"]) {
-          for (auto &surface: shell) {
-            for (auto &ring: surface) {
-              std::vector<CGAL::SM_Vertex_index> face_ids;
-              for (auto &v: ring) {
-                if (index_map.find(v.get<int>()) != index_map.end()) {
-                  face_ids.push_back(index_map[v.get<int>()]);
-                } else {
-                  CGAL::SM_Vertex_index idx = mesh.add_vertex(
-                    Point_3(
-                      vertices[v.get<int>()][0],
-                      vertices[v.get<int>()][1],
-                      vertices[v.get<int>()][2]
-                    )
-                  );
-                  index_map[v.get<int>()] = idx;
-                  face_ids.push_back(idx);
-                }
-              }
-              mesh.add_face(face_ids);
-            }
-          }
-        }
-        return true;
-      }
-    }
+    if (get_mesh_for_lod(j, key, lod_tier[i], mesh)) return true;
   }
 
   // Nothing is found, return false
   return false;
 }
-
 
 bool triangulate_mesh(Mesh &mesh, bool verbose) {
   if (is_empty(mesh)) {
@@ -85,21 +146,12 @@ bool triangulate_mesh(Mesh &mesh, bool verbose) {
     }
   }
 
-  if (CGAL::is_triangle_mesh(mesh)) {
-    std::cout << "Input mesh is triangulated." << std::endl;
-  } else {
-    // std::cout << "Input mesh is not triangulated." << std::endl;
-    PMP::triangulate_faces(mesh);
+  if (!PMP::triangulate_faces(mesh)) {
+    // Confirm that all faces are triangles.
+    std::cout << "Warning: non-triangular face left in mesh." << std::endl;
+    return false;
   }
-
-  // Confirm that all faces are triangles.
-  for (boost::graph_traits<Mesh>::face_descriptor f: faces(mesh)) {
-    if (!CGAL::is_triangle(halfedge(f, mesh), mesh)) {
-      std::cerr << "Error: non-triangular face left in mesh." << std::endl;
-      return false;
-    }
-  }
-
+  
   if (verbose) {
     for (auto f: mesh.faces()) {
       std::cout << "Face " << f.idx() << ": ";
