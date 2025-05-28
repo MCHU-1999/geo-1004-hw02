@@ -21,6 +21,7 @@
 #include <CGAL/boost/graph/helpers.h>
 #include <CGAL/Min_quadrilateral_2.h>
 #include <CGAL/Polygon_2.h>
+#include <CGAL/IO/PLY.h>
 
 //-- https://github.com/nlohmann/json
 //-- used to read and write (City)JSON
@@ -273,6 +274,10 @@ void compute_volume(json &j){
       vol += volume_from_mesh(mesh);
     }
 
+    // Output PLY file for inspection
+    // std::ofstream out(co.key() + ".ply");
+    // CGAL::IO::write_PLY(out, mesh);
+
     // std::cout << "Volume for object " << co.key() << ": " << vol << std::endl;
     co.value()["attributes"]["volume"] = vol;
   }
@@ -304,10 +309,12 @@ void compute_hausdorff(json &j) {
 
     if (has_lod13 && has_lod22) {
       // Sample points from both meshes
-      std::vector<Point_3> points_lod13 = sample_points_from_mesh_cgal(mesh_lod13, 25);
-      std::vector<Point_3> points_lod22 = sample_points_from_mesh_cgal(mesh_lod22, 25);
+      // std::vector<Point_3> points_lod13 = sample_points_from_mesh(mesh_lod13, 4);
+      // std::vector<Point_3> points_lod22 = sample_points_from_mesh(mesh_lod22, 4);
+      std::vector<Point_3> points_lod13 = sample_points_from_mesh_cgal(mesh_lod13, 4);
+      std::vector<Point_3> points_lod22 = sample_points_from_mesh_cgal(mesh_lod22, 4);
 
-      // ADD THESE LINES - Export visualization files
+      // Export visualization files
       // export_points_to_ply(points_lod13, co.key() + "_lod13_points.ply");
       // export_points_to_ply(points_lod22, co.key() + "_lod22_points.ply");
       // export_combined_points_to_ply(points_lod13, points_lod22, co.key() + "_combined_points.ply");
