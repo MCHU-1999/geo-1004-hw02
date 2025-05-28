@@ -47,7 +47,7 @@ bool get_mesh_for_lod(json& j, const std::string& building_key, const std::strin
 
             std::vector<Polygon_2> all_rings;
             for (size_t i = 0; i < surface.size(); i++) {
-              Polygon_2 inner_ring_2d;
+              Polygon_2 ring_2;
               for (auto& v : surface[i]) {
                 CGAL::SM_Vertex_index vertex_idx;
                 if (index_map.find(v.get<int>()) == index_map.end()) {
@@ -64,9 +64,9 @@ bool get_mesh_for_lod(json& j, const std::string& building_key, const std::strin
                 }
                 Point_2 projected = project_point_to_local_plane(mesh.point(vertex_idx), plane_cs);
                 point_lift_map.insert({projected, vertex_idx});
-                inner_ring_2d.push_back(projected);
+                ring_2.push_back(projected);
               }
-              all_rings.push_back(inner_ring_2d);
+              all_rings.push_back(ring_2);
             }
 
             // Insert the polygons into a constrained triangulation
