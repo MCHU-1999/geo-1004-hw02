@@ -1,25 +1,5 @@
 #include "roof_calculations.h"
-#include <vector>
-#include <string>
 
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
-#include <CGAL/Polygon_2.h>
-#include <CGAL/Polygon_with_holes_2.h>
-#include <CGAL/bounding_box.h>
-
-typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
-typedef Kernel::Point_3 Point_3;
-typedef Kernel::Vector_3 Vector_3;
-typedef Kernel::Point_2 Point_2;
-typedef CGAL::Polygon_2<Kernel> Polygon_2;
-typedef CGAL::Polygon_with_holes_2<Kernel> Polygon_with_holes_2;
-
-struct PlaneCoordinateSystem {
-    Vector_3 normal;
-    Point_3 origin;
-    Vector_3 u; // local x-axis
-    Vector_3 v; // local y-axis
-};
 
 // Based on the cross-product algorithm as explained in my DTM course notes.
 Vector_3 calculate_polygon_normal(const std::vector<Point_3> &polygon_points) {
