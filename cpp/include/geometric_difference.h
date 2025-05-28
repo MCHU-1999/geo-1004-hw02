@@ -12,8 +12,8 @@ typedef Kernel::FT                                               FT;
 typedef Kernel::Triangle_3                               Triangle_3;
 
 // Function declarations for geometric difference calculations
-std::vector<Point_3> sample_points_from_mesh_cgal(const Mesh& mesh, int pt_density = 100);
-std::vector<Point_3> sample_points_from_mesh(const Mesh& mesh, int num_samples = 1000);
+std::vector<Point_3> sample_points_from_mesh_cgal(const Mesh& mesh, int pt_density = 4);
+std::vector<Point_3> sample_points_from_mesh(const Mesh& mesh, int pt_density = 4);
 Point_3 sample_point_on_triangle(const Point_3& a, const Point_3& b, const Point_3& c);
 FT hausdorff_distance(const std::vector<Point_3>& set_a, const std::vector<Point_3>& set_b);
 FT directed_hausdorff_distance(const std::vector<Point_3>& from_set, const std::vector<Point_3>& to_set);

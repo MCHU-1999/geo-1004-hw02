@@ -30,14 +30,14 @@ std::vector<Point_3> sample_points_from_mesh_cgal(const Mesh& mesh, int pt_densi
 
         total_area += area;
     }
-    std::cout << "slow slow code bro\n";
+    // std::cout << "We have " << static_cast<int>(total_area * pt_density) << " points here.\n";
     std::copy_n(generator, static_cast<int>(total_area * pt_density), std::back_inserter(sampled_points));
 
     return sampled_points;
 }
 
 // function to sample points uniformly on mesh surface
-std::vector<Point_3> sample_points_from_mesh(const Mesh& mesh, int num_samples) {
+std::vector<Point_3> sample_points_from_mesh(const Mesh& mesh, int pt_density) {
     std::vector<Point_3> sampled_points;
     std::vector<FT> face_areas;
     FT total_area = 0.0;
@@ -60,6 +60,8 @@ std::vector<Point_3> sample_points_from_mesh(const Mesh& mesh, int num_samples) 
     }
 
     // sample points proportionally to face areas
+    int num_samples = static_cast<int>(total_area * pt_density);
+    // std::cout << "We have " << num_samples << " points here.\n";
     for (int i = 0; i < num_samples; i++) {
         // Use CGAL's random generator
         double random_area = cgal_rand.get_double(0.0, CGAL::to_double(total_area));
