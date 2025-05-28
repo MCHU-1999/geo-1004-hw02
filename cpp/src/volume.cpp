@@ -2,6 +2,17 @@
 
 const std::vector<std::string> lod_tier = {"2.2", "2.1", "2.0", "2", "1.3", "1.2", "1.1", "1.0", "1"};
 
+struct Point2Compare {
+  static constexpr double EPSILON = 1e-9;
+  
+  bool operator()(const Point_2& a, const Point_2& b) const {
+    if (std::abs(a.x() - b.x()) > EPSILON) {
+      return a.x() < b.x();
+    }
+    return a.y() < b.y() - EPSILON;
+  }
+};
+
 // Function to get mesh for specific LoD
 bool get_mesh_for_lod(json& j, const std::string& building_key, const std::string& target_lod, Mesh& mesh) {
   std::vector<std::array<int, 3>> vertices = j["vertices"].get<std::vector<std::array<int, 3>>>();
@@ -14,24 +25,88 @@ bool get_mesh_for_lod(json& j, const std::string& building_key, const std::strin
       mesh.clear();
       for (auto& shell : g.value()["boundaries"]) {
         for (auto& surface : shell) {
-          for (auto& ring : surface) {
-            std::vector<CGAL::SM_Vertex_index> face_idx;
-            for (auto& v : ring) {
-              if (index_map.find(v.get<int>()) != index_map.end()) {
-                face_idx.push_back(index_map[v.get<int>()]);
-              } else {
-                CGAL::SM_Vertex_index idx = mesh.add_vertex(
-                    Point_3(
-                        vertices[v.get<int>()][0] * scale[0],
-                        vertices[v.get<int>()][1] * scale[1],
-                        vertices[v.get<int>()][2] * scale[2]
-                    )
-                );
-                index_map[v.get<int>()] = idx;
-                face_idx.push_back(idx);
-              }
+          if (surface.size() > 1) {
+            // Oh shoot we have a hole here
+            // construct 2+ non-intersecting nested polygons
+            std::vector<Point_3> outer_ring_3;
+            for (auto& v : surface[0]) {
+              outer_ring_3.push_back(
+                Point_3(
+                  vertices[v.get<int>()][0] * scale[0],
+                  vertices[v.get<int>()][1] * scale[1],
+                  vertices[v.get<int>()][2] * scale[2]
+                )
+              );
             }
-            mesh.add_face(face_idx);
+
+            // Create a local PlaneCoordinateSystem
+            const PlaneCoordinateSystem& plane_cs = compute_plane_coordinate_system(outer_ring_3);
+
+            // Map Point_2 to CGAL::SM_Vertex_index for later use
+            std::map<Point_2, CGAL::SM_Vertex_index, Point2Compare> point_lift_map;
+
+            std::vector<Polygon_2> all_rings;
+            for (size_t i = 0; i < surface.size(); i++) {
+              Polygon_2 inner_ring_2d;
+              for (auto& v : surface[i]) {
+                CGAL::SM_Vertex_index vertex_idx;
+                if (index_map.find(v.get<int>()) == index_map.end()) {
+                  vertex_idx = mesh.add_vertex(
+                    Point_3(
+                      vertices[v.get<int>()][0] * scale[0],
+                      vertices[v.get<int>()][1] * scale[1],
+                      vertices[v.get<int>()][2] * scale[2]
+                    )
+                  );
+                  index_map[v.get<int>()] = vertex_idx;
+                } else {
+                  vertex_idx = index_map[v.get<int>()];
+                }
+                Point_2 projected = project_point_to_local_plane(mesh.point(vertex_idx), plane_cs);
+                point_lift_map.insert({projected, vertex_idx});
+                inner_ring_2d.push_back(projected);
+              }
+              all_rings.push_back(inner_ring_2d);
+            }
+
+            // Insert the polygons into a constrained triangulation
+            CT ct;
+            for (auto& polygon : all_rings) {
+              ct.insert_constraint(polygon.vertices_begin(), polygon.vertices_end(), true);
+            }
+
+            // Take out the triangles, map to mesh_pt_id and add faces into mesh
+            for (auto fit = ct.finite_faces_begin(); fit != ct.finite_faces_end(); ++fit) {
+              // if (!ct.is_i is_in_domain(fit)) continue;  // Skip triangles outside
+              
+              std::vector<CGAL::SM_Vertex_index> tri_idx;
+              for (int i = 0; i < 3; ++i) {
+                Point_2 &p2 = fit->vertex(i)->point();
+                tri_idx.push_back(point_lift_map[p2]);
+                // std::cout << "id=" << point_lift_map[p2] << "\n";
+              }
+              mesh.add_face(tri_idx);
+            }
+          } else {
+            std::vector<CGAL::SM_Vertex_index> vertex_ids;
+            for (auto& ring : surface) {
+              for (auto& v : ring) {
+                if (index_map.find(v.get<int>()) != index_map.end()) {
+                  vertex_ids.push_back(index_map[v.get<int>()]);
+                } else {
+                  CGAL::SM_Vertex_index vertex_idx = mesh.add_vertex(
+                    Point_3(
+                      vertices[v.get<int>()][0] * scale[0],
+                      vertices[v.get<int>()][1] * scale[1],
+                      vertices[v.get<int>()][2] * scale[2]
+                    )
+                  );
+                  index_map[v.get<int>()] = vertex_idx;
+                  vertex_ids.push_back(vertex_idx);
+                }
+              }
+              mesh.add_face(vertex_ids);
+            }
           }
         }
       }

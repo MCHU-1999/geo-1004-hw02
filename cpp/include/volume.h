@@ -5,19 +5,35 @@
 #include <string>
 #include <vector>
 #include <array>
+#include <unordered_map>
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/Polygon_mesh_processing/triangulate_faces.h>
-#include <CGAL/boost/graph/helpers.h>
+#include <CGAL/Constrained_triangulation_2.h>
+#include <CGAL/Polygon_2.h>
+// #include <boost/property_map/property_map.hpp>
+// #include <CGAL/boost/graph/helpers.h>
 
 #include "json.hpp" //-- it is in the /include/ folder
 using json = nlohmann::json;
 
+#include "roof_calculations.h"
+
 typedef CGAL::Exact_predicates_inexact_constructions_kernel   Kernel;
 typedef Kernel::Point_3                                      Point_3;
+typedef Kernel::Point_2                                      Point_2;
 typedef Kernel::FT                                                FT;
 typedef CGAL::Surface_mesh<Point_3>                             Mesh;
+
+// Just for handling polygons with holes
+typedef CGAL::Triangulation_vertex_base_2<Kernel>                 Vb;
+typedef CGAL::Constrained_triangulation_face_base_2<Kernel>       Fb;
+typedef CGAL::Triangulation_data_structure_2<Vb,Fb>              TDS;
+typedef CGAL::Exact_predicates_tag                              Itag;
+typedef CGAL::Constrained_triangulation_2<Kernel, TDS, Itag>      CT;
+typedef CGAL::Polygon_2<Kernel>                            Polygon_2;
+
 
 namespace PMP = CGAL::Polygon_mesh_processing;
 
