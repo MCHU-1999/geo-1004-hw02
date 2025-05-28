@@ -129,7 +129,6 @@ bool mesh_from_json(json &j, std::string key, Mesh &mesh) {
   return false;
 }
 
-
 bool triangulate_mesh(Mesh &mesh, bool verbose) {
   if (is_empty(mesh)) {
     std::cerr << "Warning: empty mesh" << std::endl;
@@ -147,21 +146,12 @@ bool triangulate_mesh(Mesh &mesh, bool verbose) {
     }
   }
 
-  if (CGAL::is_triangle_mesh(mesh)) {
-    std::cout << "Input mesh is triangulated." << std::endl;
-  } else {
-    // std::cout << "Input mesh is not triangulated." << std::endl;
-    PMP::triangulate_faces(mesh);
+  if (!PMP::triangulate_faces(mesh)) {
+    // Confirm that all faces are triangles.
+    std::cout << "Warning: non-triangular face left in mesh." << std::endl;
+    return false;
   }
-
-  // Confirm that all faces are triangles.
-  for (boost::graph_traits<Mesh>::face_descriptor f: faces(mesh)) {
-    if (!CGAL::is_triangle(halfedge(f, mesh), mesh)) {
-      std::cerr << "Error: non-triangular face left in mesh." << std::endl;
-      return false;
-    }
-  }
-
+  
   if (verbose) {
     for (auto f: mesh.faces()) {
       std::cout << "Face " << f.idx() << ": ";

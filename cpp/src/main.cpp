@@ -21,7 +21,7 @@
 #include <CGAL/boost/graph/helpers.h>
 #include <CGAL/Min_quadrilateral_2.h>
 #include <CGAL/Polygon_2.h>
-#include <CGAL/IO/PLY.h>
+
 
 //-- https://github.com/nlohmann/json
 //-- used to read and write (City)JSON
@@ -116,15 +116,19 @@ int main(int argc, const char *argv[]) {
   std::cout << "Number of vertices " << j["vertices"].size() << std::endl;
 
   //-- Calculate and add an attribute "orientation"
+  std::cout << "\ncompute_footprint_orientation()" << std::endl;
   compute_footprint_orientation(j, vertices);
 
   //-- Calculate and add attributes "area" "orientation" into roofSurface
+  std::cout << "\ncompute_roof_area_orientation()" << std::endl;
   compute_roof_area_orientation(j, vertices);
 
   //-- Calculate and add an attribute "volume"
+  std::cout << "\ncompute_volume()" << std::endl;
   compute_volume(j);
 
   //-- Calculate and add an attribute "hausdorff_lod_22_13"
+  std::cout << "\ncompute_hausdorff()" << std::endl;
   compute_hausdorff(j);
 
   //-- write to disk the modified city model (out.city.json)
@@ -218,20 +222,6 @@ void compute_roof_area_orientation(json &j, const std::vector<std::array<double,
                 inner_rings.push_back(inner_ring);
               }
 
-              // Print outer ring
-              // std::cout << "Outer ring points:" << std::endl;
-              // for (const auto &p: outer_ring) {
-              //   std::cout << "(" << p.x() << ", " << p.y() << ", " << p.z() << ")" << std::endl;
-              // }
-              //
-              // // Print inner rings
-              // for (size_t r = 0; r < inner_rings.size(); ++r) {
-              //   std::cout << "Inner ring " << r << " points:" << std::endl;
-              //   for (const auto &p: inner_rings[r]) {
-              //     std::cout << "(" << p.x() << ", " << p.y() << ", " << p.z() << ")" << std::endl;
-              //   }
-              // }
-
               // Big boy function
               auto [roof_area, roof_orientation] = analyse_roof_surface(outer_ring, inner_rings);
 
@@ -263,20 +253,18 @@ void compute_volume(json &j){
     for (auto &child: children) {
       if (!mesh_from_json(j, child, mesh)) {
         // Error
-        std::cerr << "Failed to convert building to mesh since this object doesn't have LoD >= 1.0" << std::endl;
+        std::cout << "Failed to convert building to mesh since this object doesn't have LoD >= 1.0" << std::endl;
         continue;
       }
       if (!triangulate_mesh(mesh)) {
-        // Error
-        std::cerr << "Failed to triangulate mesh" << std::endl;
+        // Error, output PLY file for inspection
+        std::cout << "Failed to triangulate the mesh, exporting this building..." << std::endl;
+        std::ofstream out("NOT_TRI_" + co.key() + ".ply");
+        CGAL::IO::write_PLY(out, mesh);
         continue;
       }
       vol += volume_from_mesh(mesh);
     }
-
-    // Output PLY file for inspection
-    // std::ofstream out(co.key() + ".ply");
-    // CGAL::IO::write_PLY(out, mesh);
 
     // std::cout << "Volume for object " << co.key() << ": " << vol << std::endl;
     co.value()["attributes"]["volume"] = vol;
@@ -309,8 +297,8 @@ void compute_hausdorff(json &j) {
 
     if (has_lod13 && has_lod22) {
       // Sample points from both meshes
-      // std::vector<Point_3> points_lod13 = sample_points_from_mesh(mesh_lod13, 4);
-      // std::vector<Point_3> points_lod22 = sample_points_from_mesh(mesh_lod22, 4);
+      // std::vector<Point_3> points_lod13 = sample_points_from_mesh(mesh_lod13, 10000);
+      // std::vector<Point_3> points_lod22 = sample_points_from_mesh(mesh_lod22, 10000);
       std::vector<Point_3> points_lod13 = sample_points_from_mesh_cgal(mesh_lod13, 4);
       std::vector<Point_3> points_lod22 = sample_points_from_mesh_cgal(mesh_lod22, 4);
 
@@ -322,7 +310,7 @@ void compute_hausdorff(json &j) {
       // Calculate Hausdorff distance
       FT hausdorff_dist = hausdorff_distance(points_lod13, points_lod22);
 
-      std::cout << "Hausdorff distance for object " << co.key() << ": " << hausdorff_dist << std::endl;
+      // std::cout << "Hausdorff distance for object " << co.key() << ": " << hausdorff_dist << std::endl;
       co.value()["attributes"]["hausdorff_lod_22_13"] = CGAL::to_double(hausdorff_dist);
     } else {
       std::cout << "Warning: Could not find both LoD 1.3 and LoD 2.2 for object " << co.key() << std::endl;

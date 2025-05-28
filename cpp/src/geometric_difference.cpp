@@ -10,9 +10,12 @@ typedef CGAL::Random_points_in_triangle_mesh_3<Mesh> Point_generator;
 // static CGAL random generator
 static CGAL::Random cgal_rand;  // This will be shared across all functions
 
+// Cap at 3000 points maximum
+static const int MAX_POINTS = 3000;
+
 std::vector<Point_3> sample_points_from_mesh_cgal(const Mesh& mesh, int pt_density) {
     std::vector<Point_3> sampled_points;
-    FT total_area = 0.0;
+    int num_points = 0;
     Point_generator generator(mesh, cgal_rand);
 
     // calculate total area
@@ -21,23 +24,26 @@ std::vector<Point_3> sample_points_from_mesh_cgal(const Mesh& mesh, int pt_densi
         const Point_3& a = mesh.point(*it);
         const Point_3& b = mesh.point(*(++it));
         const Point_3& c = mesh.point(*(++it));
-
-        // Calculate triangle area using cross product
         Kernel::Vector_3 ab = b - a;
         Kernel::Vector_3 ac = c - a;
         Kernel::Vector_3 cross = CGAL::cross_product(ab, ac);
         FT area = std::sqrt(cross.squared_length()) / 2.0;
 
-        total_area += area;
+        num_points += static_cast<int>(area*pt_density);
+        if (num_points > MAX_POINTS) {
+            num_points = MAX_POINTS;
+            break;
+        }
+        
     }
-    // std::cout << "We have " << static_cast<int>(total_area * pt_density) << " points here.\n";
-    std::copy_n(generator, static_cast<int>(total_area * pt_density), std::back_inserter(sampled_points));
+    // std::cout << "We have " << num_points << " points here.\n";
+    std::copy_n(generator, num_points, std::back_inserter(sampled_points));
 
     return sampled_points;
 }
 
 // function to sample points uniformly on mesh surface
-std::vector<Point_3> sample_points_from_mesh(const Mesh& mesh, int pt_density) {
+std::vector<Point_3> sample_points_from_mesh(const Mesh& mesh, int num_samples) {
     std::vector<Point_3> sampled_points;
     std::vector<FT> face_areas;
     FT total_area = 0.0;
@@ -60,7 +66,7 @@ std::vector<Point_3> sample_points_from_mesh(const Mesh& mesh, int pt_density) {
     }
 
     // sample points proportionally to face areas
-    int num_samples = static_cast<int>(total_area * pt_density);
+    // int num_samples = static_cast<int>(total_area * pt_density);
     // std::cout << "We have " << num_samples << " points here.\n";
     for (int i = 0; i < num_samples; i++) {
         // Use CGAL's random generator
