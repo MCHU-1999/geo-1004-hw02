@@ -125,6 +125,7 @@ int main(int argc, const char *argv[]) {
   std::ofstream o("out.city.json");
   o << j.dump(2) << std::endl;
   o.close();
+  std::cout << "\ndone!" << std::endl;
 
   return 0;
 }
