@@ -3,15 +3,13 @@
 #include <string>
 #include <vector>
 #include <array>
-#include <unordered_map>
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/Polygon_mesh_processing/triangulate_faces.h>
-#include <CGAL/boost/graph/helpers.h>
 #include <CGAL/Min_quadrilateral_2.h>
 #include <CGAL/Polygon_2.h>
-
+#include <CGAL/convex_hull_2.h>
 
 //-- https://github.com/nlohmann/json
 //-- used to read and write (City)JSON
@@ -83,7 +81,7 @@ void compute_hausdorff(json &j);
 // Main function
 int main(int argc, const char *argv[]) {
   //-- will read the file passed as an argument or twobuildings.city.json if nothing is passed
-  const char *filename = (argc > 1) ? argv[1] : "../../data/nextbk_2b.city.json";
+  const char *filename = (argc > 1) ? argv[1] : "../../data/b3.city.json";
 
   std::cout << "Processing: " << filename << std::endl;
   std::ifstream input(filename);
@@ -156,9 +154,12 @@ void compute_footprint_orientation(json &j, const std::vector<std::array<double,
         footprint.push_back(Point_2(pt[0], pt[1]));
       }
 
-      // compute the minimum rectangle
+      // Compute minimum rectangle, using first the convex_hull_2
+      // We found that, in some cases, using the footprint directly, we got shapes not at all representing the BB.
       std::vector<Point_2> p_m;
-      CGAL::min_rectangle_2(footprint.vertices_begin(), footprint.vertices_end(), std::back_inserter(p_m));
+      std::vector<Point_2> hull_points;
+      CGAL::convex_hull_2(footprint.vertices_begin(), footprint.vertices_end(), std::back_inserter(hull_points));
+      CGAL::min_rectangle_2(hull_points.begin(), hull_points.end(), std::back_inserter(p_m));
 
       // Determine the dominant vector, aka the longest vector.
       // Since it's a rectangle, we only have to compare p_m[0] and p_m[1] against p_m[1] and p_m[2].
